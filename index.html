@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Maintenance Scheduler — Prototype</title>
+
+  <!-- FullCalendar (v6.x global build) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#ffffff; --muted:#64748b; --accent:#2563eb;
+      --green:#16a34a; --amber:#f59e0b; --red:#ef4444; --shadow: 0 8px 20px rgba(2,6,23,0.06);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#0f172a}
+    .app{max-width:1200px;margin:18px auto;padding:18px;display:grid;grid-template-columns:1fr 340px;gap:16px}
+    header{grid-column:1/-1;display:flex;gap:12px;align-items:center;justify-content:space-between}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    .btn{border:1px solid #e6eef8;background:var(--card);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn.ghost{background:transparent}
+    .btn.primary{background:linear-gradient(180deg,var(--accent),#194fbf);color:white;border:0}
+    .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+    #calendar{min-height:620px}
+    .side{position:sticky;top:18px;height:fit-content;display:flex;flex-direction:column;gap:12px}
+    .kpi{display:grid;grid-template-columns:auto 1fr;gap:6px;padding:8px;border-radius:8px;background:#f9fafb;border:1px solid #eef2ff}
+    .muted{color:var(--muted);font-size:13px}
+    .list-table{width:100%;border-collapse:collapse}
+    .list-table th,.list-table td{padding:8px;border-bottom:1px solid #eef2ff;text-align:left;font-size:13px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px;color:#fff}
+    .type-Preventive{background:var(--accent)}
+    .type-Predictive{background:#6b21a8}
+    .type-Corrective{background:var(--amber)}
+    .type-Breakdown{background:var(--red)}
+    .status-Planned{background:#64748b}
+    .status-InProgress{background:var(--amber)}
+    .status-Completed{background:var(--green)}
+    .status-Cancelled{background:#94a3b8}
+
+    /* modal */
+    .overlay{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center;z-index:60}
+    .modal{width:860px;max-width:95vw;background:var(--card);border-radius:12px;padding:12px}
+    .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    label{font-size:13px;font-weight:700;color:#0b1220}
+    input[type="text"],input[type="datetime-local"],select,textarea{width:100%;padding:8px;border:1px solid #e6eef8;border-radius:8px}
+    textarea{min-height:74px;resize:vertical}
+    .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+
+    /* list view area */
+    .full-list{grid-column:1/-1}
+    .small-muted{font-size:12px;color:var(--muted)}
+
+    /* responsive */
+    @media (max-width:1000px){
+      .app{grid-template-columns:1fr; padding:10px}
+      .side{position:static}
+      .overlay .modal{width:95%}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Maintenance Scheduler</h1>
+        <div class="small-muted">Calendar • Tips • List • Missed • Completion Reports</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="btnTips">Maintenance Tips</button>
+        <button class="btn" id="btnList">List View</button>
+        <button class="btn" id="btnMissed">Missed Maintenance</button>
+        <button class="btn primary" id="btnNewTask">+ New Task</button>
+      </div>
+    </header>
+
+    <!-- Calendar -->
+    <div class="card" id="calendarCard">
+      <div id="calendar"></div>
+    </div>
+
+    <!-- Right side -->
+    <aside class="side">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>KPIs</strong><div class="small-muted">At a glance</div></div>
+          <div><button class="btn" id="btnExportAll">Export CSV</button></div>
+        </div>
+        <div style="margin-top:10px;display:grid;gap:8px">
+          <div class="kpi"><div class="small-muted">Planned</div><div id="kpiPlanned">0</div></div>
+          <div class="kpi"><div class="small-muted">In-Progress</div><div id="kpiInProgress">0</div></div>
+          <div class="kpi"><div class="small-muted">Completed</div><div id="kpiCompleted">0</div></div>
+          <div class="kpi"><div class="small-muted">Overdue</div><div id="kpiOverdue">0</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="tipsPanel" style="display:none">
+        <strong>Maintenance Tips</strong>
+        <div id="tipsContent" class="small-muted" style="margin-top:8px">No tips yet — click "Maintenance Tips".</div>
+        <div style="margin-top:10px;text-align:right"><button class="btn" id="btnRefreshTips">Refresh</button></div>
+      </div>
+
+      <div class="card">
+        <strong>Quick Filters</strong>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <select id="filterMachine" style="padding:8px;border-radius:8px;border:1px solid #e6eef8">
+            <option value="__ALL__">All machines</option>
+          </select>
+          <select id="filterType" style="padding:8px;border-radius:8px;border:1px solid #e6eef8">
+            <option value="__ALL__">All types</option>
+            <option>Preventive</option>
+            <option>Predictive</option>
+            <option>Corrective</option>
+            <option>Breakdown</option>
+          </select>
+          <button class="btn" id="btnApplyFilter">Apply</button>
+          <button class="btn" id="btnClearFilter">Clear</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- List / Missed overlay area (below calendar when toggled) -->
+  <div class="app" style="padding-top:0;">
+    <div class="card full-list" id="listArea" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong id="listTitle">Maintenance Tasks</strong><div class="small-muted" id="listSubtitle">All tasks</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="btnExportList">Export Visible CSV</button>
+          <button class="btn" id="btnCloseList">Close</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;overflow:auto">
+        <table class="list-table" id="tasksTable">
+          <thead><tr><th>Machine</th><th>Type</th><th>Start</th><th>End</th><th>Status</th><th>Assigned</th><th>Actions</th></tr></thead>
+          <tbody id="tasksTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal add/edit -->
+  <div class="overlay" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong id="modalTitle">New Maintenance Task</strong>
+        <button class="btn" id="closeModal">Close</button>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
+        <div>
+          <label>Machine</label>
+          <input type="text" id="mMachine" placeholder="e.g., Pump A">
+        </div>
+        <div>
+          <label>Type</label>
+          <select id="mType">
+            <option>Preventive</option>
+            <option>Predictive</option>
+            <option>Corrective</option>
+            <option>Breakdown</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Assigned Technician</label>
+          <input type="text" id="mTech" placeholder="Technician name">
+        </div>
+        <div>
+          <label>Priority (1-4)</label>
+          <select id="mPriority"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        </div>
+
+        <div>
+          <label>Start (date/time)</label>
+          <input type="datetime-local" id="mStart">
+        </div>
+        <div>
+          <label>End (date/time)</label>
+          <input type="datetime-local" id="mEnd">
+        </div>
+
+        <div style="grid-column:1 / -1">
+          <label>Notes / Work Details</label>
+          <textarea id="mNotes" placeholder="Describe work to do, spares required..."></textarea>
+        </div>
+
+        <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+          <button class="btn" id="btnDeleteTask" style="display:none">Delete</button>
+          <button class="btn" id="btnSaveTask">Save Task</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /*************************************************************************
+   * Maintenance Scheduler Prototype
+   * - Single-file prototype for calendar, list, missed, tips, completion report
+   * - Uses FullCalendar for calendar UI
+   * - Persists tasks to localStorage for demo
+   *************************************************************************/
+
+  // ---------- Constants & state ----------
+  const STORAGE_KEY = "mt_scheduler_tasks_v1";
+  const DEFAULT_MACHINES = ["Pump A","Motor B","Compressor C","CNC-01","Fan-03"];
+  const STATUS_PLANNED = "Planned", STATUS_INPROG = "InProgress", STATUS_COMPLETED = "Completed", STATUS_CANCELLED = "Cancelled";
+  let calendar, tasks = [], filteredTasks = [];
+  let editingTaskId = null;
+
+  // ---------- Utils ----------
+  function uid(prefix="id"){ return prefix + "-" + Math.random().toString(36).slice(2,10); }
+  function saveTasks(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks || [])); }
+  function loadTasks(){ try{ tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ tasks = []; } }
+  function fmtDateISO(d){ if(!d) return ""; return (new Date(d)).toLocaleString(); }
+  function toISOForInput(d){ if(!d) return ""; const dt = new Date(d); const tzOffset = dt.getTimezoneOffset()*60000; const localISO = new Date(dt - tzOffset).toISOString().slice(0,16); return localISO; }
+  function parseInputDate(v){ if(!v) return null; return new Date(v).getTime(); }
+
+  // ---------- Sample data (initialize once) ----------
+  function seedSample(){
+    if (localStorage.getItem(STORAGE_KEY)) return;
+    const now = Date.now();
+    tasks = [
+      { id: uid("t"), machine:"Pump A", type:"Preventive", start: now + 3600*1000*6, end: now + 3600*1000*10, tech:"Rajesh", status: STATUS_PLANNED, priority:2, notes:"Lubricate & inspect seals", created: now, updated: now },
+      { id: uid("t"), machine:"Motor B", type:"Corrective", start: now - 3600*1000*48, end: now - 3600*1000*42, tech:"Anil", status: STATUS_COMPLETED, priority:1, notes:"Replaced worn bearing", created: now - 3*24*3600*1000, updated: now - 48*3600*1000 },
+      { id: uid("t"), machine:"CNC-01", type:"Preventive", start: now - 3600*1000*120, end: now - 3600*1000*118, tech:"Ramesh", status: STATUS_PLANNED, priority:2, notes:"Coolant flush", created: now - 5*24*3600*1000, updated: now - 5*24*3600*1000 },
+      { id: uid("t"), machine:"Compressor C", type:"Breakdown", start: now + 3600*1000*24, end: now + 3600*1000*28, tech:"Suresh", status: STATUS_INPROG, priority:1, notes:"Investigate pressure drop", created: now - 3600*1000*2, updated: now - 3600*1000 }
+    ];
+    saveTasks();
+  }
+
+  // ---------- Calendar setup ----------
+  function startCalendar(){
+    const el = document.getElementById("calendar");
+    calendar = new FullCalendar.Calendar(el, {
+      initialView: "dayGridMonth",
+      height: "auto",
+      editable: true,
+      selectable: true,
+      headerToolbar: { left:"prev,next today", center:"title", right:"dayGridMonth,timeGridWeek,timeGridDay" },
+      eventContent: function(arg){
+        const p = arg.event.extendedProps;
+        const machine = p.machine || arg.event.title;
+        const html = `<div style="font-weight:800">${machine}</div><div style="font-size:12px">${p.type} • ${p.tech||""}</div>`;
+        return { html: html };
+      },
+      dateClick: function(info){
+        openModalForDate(info.date);
+      },
+      eventClick: function(info){
+        showEditModal(info.event.extendedProps._taskId);
+      },
+      eventDrop: function(info){ // drag-and-drop - update start/end
+        const id = info.event.extendedProps._taskId;
+        const t = tasks.find(x=>x.id===id); if(!t) return;
+        t.start = info.event.start ? info.event.start.getTime() : t.start;
+        t.end   = info.event.end   ? info.event.end.getTime()   : t.end;
+        t.updated = Date.now();
+        saveTasks(); refreshCalendar();
+      },
+      eventResize: function(info){
+        const id = info.event.extendedProps._taskId;
+        const t = tasks.find(x=>x.id===id); if(!t) return;
+        t.start = info.event.start ? info.event.start.getTime() : t.start;
+        t.end   = info.event.end   ? info.event.end.getTime()   : t.end;
+        t.updated = Date.now();
+        saveTasks(); refreshCalendar();
+      }
+    });
+    calendar.render();
+  }
+
+  // ---------- Render helpers ----------
+  function taskToEvent(t){
+    const classes = [`type-${t.type.replace(/\s+/g,"")}`, `status-${t.status}`];
+    return {
+      id: t.id,
+      title: t.machine,
+      start: t.start,
+      end: t.end,
+      allDay: false,
+      classNames: classes,
+      extendedProps: Object.assign({}, t, { _taskId: t.id })
+    };
+  }
+
+  function refreshCalendar(){
+    calendar.removeAllEvents();
+    const visible = applyFilters(tasks);
+    visible.forEach(t => calendar.addEvent(taskToEvent(t)));
+    updateKPIs(visible);
+  }
+
+  function populateMachineFilter(){
+    const sel = document.getElementById("filterMachine");
+    sel.innerHTML = '<option value="__ALL__">All machines</option>';
+    const set = new Set(tasks.map(t=>t.machine).filter(Boolean));
+    Array.from(set).sort().forEach(m => {
+      const opt = document.createElement("option"); opt.value = m; opt.textContent = m; sel.appendChild(opt);
+    });
+  }
+
+  function applyFilters(arr){
+    const m = document.getElementById("filterMachine").value;
+    const type = document.getElementById("filterType").value;
+    return arr.filter(t => {
+      if(m && m!=="__ALL__" && t.machine !== m) return false;
+      if(type && type!=="__ALL__" && t.type !== type) return false;
+      return true;
+    });
+  }
+
+  function updateKPIs(visible){
+    const now = Date.now();
+    const planned = visible.filter(t => t.status===STATUS_PLANNED).length;
+    const inprog = visible.filter(t => t.status===STATUS_INPROG).length;
+    const comp = visible.filter(t => t.status===STATUS_COMPLETED).length;
+    const overdue = visible.filter(t => {
+      return t.status !== STATUS_COMPLETED && t.end && t.end < now;
+    }).length;
+    document.getElementById("kpiPlanned").textContent = planned;
+    document.getElementById("kpiInProgress").textContent = inprog;
+    document.getElementById("kpiCompleted").textContent = comp;
+    document.getElementById("kpiOverdue").textContent = overdue;
+  }
+
+  // ---------- Modal / CRUD ----------
+  function openModalForDate(jsDate){
+    editingTaskId = null;
+    document.getElementById("modalTitle").textContent = "New Maintenance Task";
+    document.getElementById("mMachine").value = "";
+    document.getElementById("mType").value = "Preventive";
+    document.getElementById("mTech").value = "";
+    document.getElementById("mPriority").value = "2";
+    document.getElementById("mNotes").value = "";
+    const startIso = toISOForInput(jsDate ? jsDate.getTime() : Date.now());
+    const endIso = toISOForInput(jsDate ? (jsDate.getTime() + 3600*1000*4) : (Date.now() + 3600*1000*4));
+    document.getElementById("mStart").value = startIso;
+    document.getElementById("mEnd").value = endIso;
+    document.getElementById("btnDeleteTask").style.display = "none";
+    showOverlay(true);
+  }
+
+  function showEditModal(taskId){
+    const t = tasks.find(x=>x.id===taskId); if(!t) return alert("Task not found");
+    editingTaskId = t.id;
+    document.getElementById("modalTitle").textContent = "Edit Maintenance Task";
+    document.getElementById("mMachine").value = t.machine || "";
+    document.getElementById("mType").value = t.type || "Preventive";
+    document.getElementById("mTech").value = t.tech || "";
+    document.getElementById("mPriority").value = (t.priority||2).toString();
+    document.getElementById("mNotes").value = t.notes || "";
+    document.getElementById("mStart").value = toISOForInput(t.start);
+    document.getElementById("mEnd").value = toISOForInput(t.end);
+    document.getElementById("btnDeleteTask").style.display = "inline-block";
+    showOverlay(true);
+  }
+
+  function showOverlay(show){
+    document.getElementById("modalOverlay").style.display = show ? "flex" : "none";
+  }
+
+  function saveTaskFromModal(){
+    const machine = document.getElementById("mMachine").value.trim();
+    const type = document.getElementById("mType").value;
+    const tech = document.getElementById("mTech").value.trim();
+    const priority = Number(document.getElementById("mPriority").value || 2);
+    const notes = document.getElementById("mNotes").value.trim();
+    const start = parseInputDate(document.getElementById("mStart").value);
+    const end = parseInputDate(document.getElementById("mEnd").value);
+    if(!machine || !type || !start || !end){ return alert("Please fill machine, type, start & end"); }
+
+    if(editingTaskId){
+      const t = tasks.find(x=>x.id===editingTaskId);
+      if(!t) return alert("Task not found");
+      t.machine = machine; t.type = type; t.tech = tech; t.priority = priority; t.notes = notes;
+      t.start = start; t.end = end; t.updated = Date.now();
+    } else {
+      const newTask = {
+        id: uid("t"),
+        machine, type, tech, priority, notes,
+        start, end,
+        status: STATUS_PLANNED,
+        created: Date.now(), updated: Date.now()
+      };
+      tasks.push(newTask);
+    }
+    saveTasks(); refreshCalendar(); populateMachineFilter(); showOverlay(false);
+  }
+
+  function deleteEditingTask(){
+    if(!editingTaskId) return;
+    if(!confirm("Delete this task?")) return;
+    tasks = tasks.filter(x=>x.id!==editingTaskId);
+    saveTasks(); refreshCalendar(); populateMachineFilter(); showOverlay(false);
+  }
+
+  // ---------- List view rendering ----------
+  function openListView(filterType=null, missed=false){
+    document.getElementById("listArea").style.display = "block";
+    const titleEl = document.getElementById("listTitle");
+    const subtitleEl = document.getElementById("listSubtitle");
+    let rows = tasks.slice();
+    if(filterType && filterType!=="__ALL__"){
+      rows = rows.filter(t=>t.type===filterType);
+      titleEl.textContent = `${filterType} Tasks`;
+      subtitleEl.textContent = `Filtered by ${filterType}`;
+    } else if(missed){
+      const now = Date.now();
+      rows = rows.filter(t => t.status !== STATUS_COMPLETED && t.end && t.end < now);
+      titleEl.textContent = "Missed / Overdue Maintenance";
+      subtitleEl.textContent = `Overdue tasks (sorted by overdue)`;
+    } else {
+      titleEl.textContent = "Maintenance Tasks";
+      subtitleEl.textContent = `All tasks`;
+    }
+
+    // sort missed by how overdue
+    if(missed) rows.sort((a,b)=> (a.end || 0) - (b.end || 0));
+
+    const tbody = document.getElementById("tasksTbody"); tbody.innerHTML = "";
+    rows.forEach(t => {
+      const tr = document.createElement("tr");
+      const statusHtml = `<span class="badge status-${t.status}">${t.status}</span>`;
+      const typeHtml = `<span class="badge type-${t.type.replace(/\s+/g,"")}">${t.type}</span>`;
+      tr.innerHTML = `<td>${escapeHtml(t.machine)}</td>
+                      <td>${typeHtml}</td>
+                      <td>${fmtDateISO(t.start)}</td>
+                      <td>${fmtDateISO(t.end)}</td>
+                      <td>${statusHtml}</td>
+                      <td>${escapeHtml(t.tech||"-")}</td>
+                      <td>
+                        <button class="btn" data-id="${t.id}" onclick="markCompleteHandler(event)">Mark Complete</button>
+                        <button class="btn" data-id="${t.id}" onclick="editHandler(event)">Edit</button>
+                      </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---------- Actions ----------
+  function editHandler(ev){
+    const id = ev.target.getAttribute("data-id");
+    showEditModal(id);
+  }
+
+  function markCompleteHandler(ev){
+    const id = ev.target.getAttribute("data-id");
+    const t = tasks.find(x=>x.id===id); if(!t) return alert("Task not found");
+    if(t.status === STATUS_COMPLETED) return alert("Already completed");
+    if(!confirm("Mark task as Completed?")) return;
+
+    t.status = STATUS_COMPLETED;
+    t.updated = Date.now();
+    saveTasks(); refreshCalendar();
+
+    // ask for report
+    setTimeout(()=> { // small delay so UI updates
+      if(confirm("Do you want to generate the Maintenance Completion Report now?")){
+        generateCompletionReport(t);
+      }
+    }, 10);
+  }
+
+  // ---------- Report generation ----------
+  function generateCompletionReport(task){
+    // Build a simple printable HTML report and open in new window
+    const doc = `
+      <html>
+      <head>
+        <title>Maintenance Completion Report - ${escapeHtml(task.machine)}</title>
+        <style>
+          body{font-family:Arial;margin:24px;color:#0f172a}
+          h2{margin:0 0 8px}
+          .meta{margin-top:12px}
+          .meta div{margin:6px 0}
+          .section{margin-top:18px}
+          table{width:100%;border-collapse:collapse}
+          th,td{padding:8px;border:1px solid #e6eef8}
+          .small{font-size:13px;color:#64748b}
+        </style>
+      </head>
+      <body>
+        <h2>Maintenance Completion Report</h2>
+        <div class="small">Generated: ${new Date().toLocaleString()}</div>
+
+        <div class="meta">
+          <div><strong>Machine:</strong> ${escapeHtml(task.machine)}</div>
+          <div><strong>Task Type:</strong> ${escapeHtml(task.type)}</div>
+          <div><strong>Assigned Technician:</strong> ${escapeHtml(task.tech||"-")}</div>
+          <div><strong>Scheduled:</strong> ${fmtDateISO(task.start)} — ${fmtDateISO(task.end)}</div>
+          <div><strong>Actual Completion:</strong> ${new Date(task.updated).toLocaleString()}</div>
+          <div><strong>Priority:</strong> ${escapeHtml(String(task.priority||"-"))}</div>
+        </div>
+
+        <div class="section">
+          <h3>Work Performed</h3>
+          <p>${escapeHtml(task.notes || "Not specified")}</p>
+        </div>
+
+        <div class="section">
+          <h3>Parts / Consumables Used</h3>
+          <p>${escapeHtml(task.parts || "Not recorded")}</p>
+        </div>
+
+        <div class="section">
+          <h3>Time & Performance</h3>
+          <table><tr><th>MTTR (hrs)</th><th>Downtime Impact</th></tr>
+          <tr><td>${calcMTTRHours(task)}</td><td>—</td></tr></table>
+        </div>
+
+        <div class="section">
+          <h3>Observations & Recommendations</h3>
+          <p>${escapeHtml(task.recommendations || "None")}</p>
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:40px">
+          <div>
+            <div style="font-weight:700">Technician</div><div style="height:48px;border-bottom:1px solid #e6eef8"></div>
+          </div>
+          <div>
+            <div style="font-weight:700">Supervisor</div><div style="height:48px;border-bottom:1px solid #e6eef8"></div>
+          </div>
+        </div>
+
+        <script>setTimeout(()=>{window.print();}, 200);</script>
+      </body>
+      </html>
+    `;
+    const w = window.open("", "_blank");
+    w.document.open();
+    w.document.write(doc);
+    w.document.close();
+  }
+
+  function calcMTTRHours(task){
+    if(!task.start || !task.end) return "-";
+    const hrs = Math.max(0, (task.end - task.start) / (3600*1000));
+    return hrs.toFixed(2);
+  }
+
+  // ---------- Tips engine (basic) ----------
+  function generateTips(){
+    // For prototype: simple tips derived from overdue, MTBF/MTTR placeholders
+    const now = Date.now();
+    const tips = [];
+    // overdue tips
+    tasks.filter(t => t.status !== STATUS_COMPLETED && t.end && t.end < now)
+      .slice(0,5)
+      .forEach(t => {
+        const overdueHrs = Math.round((now - t.end) / (3600*1000));
+        tips.push(`${t.machine} (${t.type}) is overdue by ${overdueHrs} hrs — prioritize.`);
+      });
+
+    // tasks nearing due (within 24 hrs)
+    tasks.filter(t => t.status !== STATUS_COMPLETED && t.end && (t.end - now) > 0 && (t.end - now) <= 24*3600*1000)
+      .forEach(t => {
+        tips.push(`${t.machine} (${t.type}) due within 24 hrs — consider scheduling in low-production window.`);
+      });
+
+    // generic example tips
+    tips.push("If MTTR is > 4 hrs for a task, schedule during night shift to reduce production loss.");
+    tips.push("Check spare parts inventory before scheduling high-priority tasks.");
+
+    return tips;
+  }
+
+  // ---------- Exports ----------
+  function exportTasksCSV(list){
+    const rows = [["Machine","Type","Start","End","Status","Technician","Priority","Notes"]];
+    (list||tasks).forEach(t => rows.push([t.machine,t.type, new Date(t.start).toLocaleString(), new Date(t.end).toLocaleString(), t.status, t.tech||"", t.priority||"", (t.notes||"").replace(/\n/g," ")]));
+    const csv = rows.map(r => r.map(c => `"${String(c||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "maintenance_tasks.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- Helpers (escape) ----------
+  function escapeHtml(s){
+    return String(s||"").replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------- Wiring UI ----------
+  document.getElementById("btnNewTask").addEventListener("click", ()=>openModalForDate(new Date()));
+  document.getElementById("closeModal").addEventListener("click", ()=>showOverlay(false));
+  document.getElementById("btnSaveTask").addEventListener("click", saveTaskFromModal);
+  document.getElementById("btnDeleteTask").addEventListener("click", deleteEditingTask);
+
+  document.getElementById("btnList").addEventListener("click", ()=>{ openListView(); });
+  document.getElementById("btnMissed").addEventListener("click", ()=>{ openListView(null,true); });
+  document.getElementById("btnTips").addEventListener("click", ()=>{
+    document.getElementById("tipsPanel").style.display = "block";
+    const tips = generateTips();
+    document.getElementById("tipsContent").innerHTML = tips.map(t=>`<div style="margin-bottom:8px">• ${escapeHtml(t)}</div>`).join("");
+  });
+  document.getElementById("btnRefreshTips").addEventListener("click", ()=>{
+    document.getElementById("tipsContent").innerHTML = generateTips().map(t=>`<div style="margin-bottom:8px">• ${escapeHtml(t)}</div>`).join("");
+  });
+
+  document.getElementById("btnCloseList").addEventListener("click", ()=>{ document.getElementById("listArea").style.display = "none"; });
+  document.getElementById("btnExportAll").addEventListener("click", ()=>exportTasksCSV(tasks));
+  document.getElementById("btnExportList").addEventListener("click", ()=> {
+    const visible = applyFilters(tasks);
+    exportTasksCSV(visible);
+  });
+
+  document.getElementById("btnApplyFilter").addEventListener("click", ()=>{ refreshCalendar(); openListView(); });
+  document.getElementById("btnClearFilter").addEventListener("click", ()=>{ document.getElementById("filterMachine").value="__ALL__"; document.getElementById("filterType").value="__ALL__"; refreshCalendar(); });
+
+  // Expose handlers for inline buttons in table rows
+  window.markCompleteHandler = function(ev){ markCompleteHandler(ev); };
+  window.editHandler = function(ev){ editHandler(ev); };
+
+  // ---------- Init ----------
+  seedSample();
+  loadTasks();
+  startCalendar();
+  populateMachineFilter();
+  refreshCalendar();
+
+  // refresh KPIs periodically (demo)
+  setInterval(()=>{ loadTasks(); refreshCalendar(); populateMachineFilter(); }, 30*1000);
+
+  </script>
+</body>
+</html>
