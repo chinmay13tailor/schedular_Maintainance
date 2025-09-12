@@ -52,7 +52,7 @@
   .rail button.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
   .rail button:hover{background:#f8fafc}
 
-  /* Main calendar card */
+  /* Main area (calendar/list container) */
   .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
   #mainCard{grid-column:2 / 3;grid-row:3 / 4;min-height:560px}
   #calendar{min-height:560px}
@@ -106,6 +106,17 @@
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
+  /* ===== List/Missed tables ===== */
+  .toolbar-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--ring)}
+  .table-wrap{overflow:auto;max-height:68vh}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:#f8fafc;z-index:1}
+  th,td{border-bottom:1px solid var(--ring);padding:8px 10px;text-align:left;white-space:nowrap}
+  tr:hover{background:#f9fafb;cursor:pointer}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
+  .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
+  .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
+
   /* ===== PDF styles ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
   .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
@@ -127,13 +138,10 @@
   .sign{flex:1;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;min-height:72px}
   .r-fine{display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:8px 2px}
 
-  /* ===== Modal / Overlay – FIXED & TOPMOST ===== */
+  /* ===== Modal / Overlay ===== */
   .overlay{
-    position:fixed;inset:0;
-    background:rgba(15,23,42,.45);           /* darker backdrop */
-    display:none;align-items:center;justify-content:center;
-    z-index:9999;                             /* << ensure on top of everything */
-    padding:16px;                             /* small gutter on mobile */
+    position:fixed;inset:0;background:rgba(15,23,42,.45);
+    display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;
   }
   .modal{
     width:min(680px,92vw);max-height:90vh;overflow:auto;
@@ -187,8 +195,37 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main calendar -->
-  <div id="mainCard" class="card"><div id="calendar"></div></div>
+  <!-- Main area: Calendar/List/Tips/Missed -->
+  <div id="mainCard" class="card">
+    <!-- Calendar view -->
+    <div id="viewCalendar"><div id="calendar"></div></div>
+
+    <!-- List view -->
+    <div id="viewList" style="display:none;">
+      <div class="toolbar-row">
+        <strong>List View</strong>
+        <span class="muted" id="listCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="listTable">
+          <thead><tr>
+            <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tips placeholder -->
+    <div id="viewTips" style="display:none;padding:18px;">
+      <div class="empty">Tips will appear here.</div>
+    </div>
+
+    <!-- Missed placeholder -->
+    <div id="viewMissed" style="display:none;padding:18px;">
+      <div class="empty">Missed view coming soon.</div>
+    </div>
+  </div>
 
   <!-- Right details -->
   <aside class="side">
@@ -332,6 +369,7 @@ function eventContent(arg){
 
 /************ STATE ************/
 var state = {
+  view: "calendar",
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
@@ -421,16 +459,80 @@ function applyFilters(events){
     return okMa && okTy && okSt && okTe;
   });
 }
-$("#btnApplyFilters").addEventListener("click", function(){
+
+/************ LIST RENDER ************/
+function badge(status){
+  var c = String(status||"Planned").toLowerCase().replace("in-progress","inprogress");
+  return '<span class="badge '+c+'">'+escapeHtml(status||"Planned")+'</span>';
+}
+function renderList(events){
+  var tbody = $("#listTable tbody"); tbody.innerHTML = "";
+  events.forEach(ev=>{
+    var p = ev.extendedProps;
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td>'+escapeHtml(new Date(p.MS_Start).toLocaleDateString())+'</td>'+
+      '<td>'+escapeHtml(msToHHMM(p.MS_Start))+'</td>'+
+      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
+      '<td>'+badge(p.MS_Status)+'</td>'+
+      '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
+    tr.addEventListener("click", function(){
+      // show details in right pane (same as clicking event)
+      state.selectedEvent = ev;
+      var fake = { extendedProps: p }; // reuse details UI
+      showDetails({ extendedProps: p });
+    });
+    tbody.appendChild(tr);
+  });
+  $("#listCount").textContent = "Showing "+events.length+" task(s)";
+}
+
+/************ VIEW SWITCH ************/
+function setActiveButton(id){
+  ["navCalendar","navTips","navList","navMissed"].forEach(k=>$("#"+k).classList.remove("active"));
+  $("#"+id).classList.add("active");
+}
+function showView(name){
+  state.view = name;
+  $("#viewCalendar").style.display = (name==="calendar")?"block":"none";
+  $("#viewList").style.display     = (name==="list")?"block":"none";
+  $("#viewTips").style.display     = (name==="tips")?"block":"none";
+  $("#viewMissed").style.display   = (name==="missed")?"block":"none";
+  setActiveButton(name==="calendar"?"navCalendar":name==="tips"?"navTips":name==="list"?"navList":"navMissed");
+  refreshView();
+}
+$("#navCalendar").addEventListener("click", ()=>showView("calendar"));
+$("#navTips").addEventListener("click",     ()=>showView("tips"));
+$("#navList").addEventListener("click",     ()=>showView("list"));
+$("#navMissed").addEventListener("click",   ()=>showView("missed"));
+
+function refreshView(){
   var filtered = applyFilters(state.lastEventsFull);
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
-  loading("Loaded "+filtered.length+" task(s)");
+  if (state.view==="calendar"){
+    if (state.calendar){
+      state.calendar.removeAllEvents();
+      state.calendar.addEventSource(filtered);
+    }
+    loading("Loaded "+filtered.length+" task(s)");
+  } else if (state.view==="list"){
+    renderList(filtered);
+    loading("Loaded "+filtered.length+" task(s)");
+  } else {
+    loading("");
+  }
+}
+
+/************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
+$("#btnApplyFilters").addEventListener("click", function(){
+  refreshView();
 });
 $("#btnResetFilters").addEventListener("click", function(){
   $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull);
-  loading("Loaded "+state.lastEventsFull.length+" task(s)");
+  refreshView();
 });
 
 /************ AUTO-REFRESH (5s, 3 min max) ************/
@@ -446,10 +548,8 @@ function startAutoRefresh(expectedTs, predicate){
       .then(function(events){
         state.lastEventsFull = events.slice();
         populateFilters(events);
-        var filtered = applyFilters(events);
-        state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+        refreshView();
         $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
-        loading("Loaded "+filtered.length+" task(s) — auto-refreshing…");
         if (expectedTs!=null){
           var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
           if (found){
@@ -536,14 +636,11 @@ function addOneTech(){
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
 
-/* Close overlay */
 function closeOverlay(){
-  overlay.style.display="none";
-  document.body.style.overflow="";          // enable background scroll again
+  overlay.style.display="none"; document.body.style.overflow="";
 }
 $("#closeModal").addEventListener("click", closeOverlay);
 
-/* Open modal helpers */
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
 $("#saveTask").addEventListener("click", function(){ if (state.mode==="update") onUpdate(); else onCreate(); });
 
@@ -568,8 +665,7 @@ $("#btnEdit").addEventListener("click", function(){
   $("#fDesc").value     = p.MS_Description || "";
   $("#fTasks").value    = p.MS_Task || "";
 
-  overlay.style.display="flex";
-  document.body.style.overflow="hidden";    // lock scroll while modal open
+  overlay.style.display="flex"; document.body.style.overflow="hidden";
 });
 
 $("#btnCancel").addEventListener("click", function(){
@@ -616,8 +712,7 @@ function openModalForDate(jsDate){
   state.technicians=[]; refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
   $("#fTasks").value="";
-  overlay.style.display="flex";
-  document.body.style.overflow="hidden";    // lock scroll
+  overlay.style.display="flex"; document.body.style.overflow="hidden";
 }
 function collectPayload(){
   var dateStr = $("#fDate").value;
@@ -653,7 +748,7 @@ function onCreate(){
   loading("Saving…"); busy(true);
   writeAttributes(payload, { mode:"create" })
     .then(function(){
-      closeOverlay();                         // hide popup + release scroll
+      closeOverlay();
       startAutoRefresh(payload.MS_Start, null);
     })
     .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
@@ -850,21 +945,19 @@ function startCalendar(){
         .then(function(events){
           state.lastEventsFull = events.slice();
           populateFilters(events);
-          var filtered = applyFilters(events);
-          state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+          refreshView(); // renders either calendar or list based on state.view
           $("#details").className="empty"; $("#details").textContent="Select a task";
           $("#sideActions").style.display="none";
-          loading("Loaded "+filtered.length+" task(s)");
         })
         .catch(function(err){
           console.error(err); loading(err.message || "Failed to load");
-          state.calendar.removeAllEvents();
+          if (state.calendar) state.calendar.removeAllEvents();
         });
     }
   });
   state.calendar.render();
 
-  // Legends on toolbar right
+  // Legends on toolbar right (calendar only)
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
