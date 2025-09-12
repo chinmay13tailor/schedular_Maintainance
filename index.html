@@ -44,7 +44,6 @@
   .status-completed{background:var(--green)}
   .status-cancelled{background:var(--red)}
   .status-postponed{background:var(--gray)}
-
   .muted{color:#64748b}
   #loading{font-size:12px;color:#64748b;margin-left:8px}
 
@@ -103,12 +102,13 @@
   <div class="card"><div id="calendar"></div></div>
 
   <aside class="side">
-    <h3 class="h6">Maintenance task</h3>
+    <h3 class="h6">Maintenance details</h3>
     <div id="details" class="empty">Select a task on the calendar</div>
     <div class="side-actions" id="sideActions" style="display:none">
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
       <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
       <button class="btn primary" id="btnNew"    type="button">New</button>
+      <button class="btn"         id="btnPDF"    type="button">Generate Task (PDF)</button>
     </div>
   </aside>
 </div>
@@ -166,18 +166,12 @@
         <div id="techChips" class="chips"></div>
       </div>
 
-      <!-- NEW: Tasks / Checklist -->
       <div class="row-full">
-        <label>Tasks / Checklist</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="taskOne" class="input" type="text" placeholder="Type a task and click +">
-          <button class="btn ghost" id="addTaskBtn" type="button">+</button>
-        </div>
-        <div id="taskChips" class="chips"></div>
-        <div class="muted" style="font-size:12px">Saved in <code>MS_Task</code> (comma-separated).</div>
+        <label>Tasks (comma-separated)</label>
+        <textarea id="fTasks" class="input" rows="2" placeholder="e.g., Inspect guards, Check belt tension, Lubricate bearings"></textarea>
       </div>
 
-      <div class="row-full">
+      <div>
         <label>Status</label>
         <select id="fStatus" class="input">
           <option>Planned</option><option>In-Progress</option><option>Completed</option><option>Cancelled</option><option>Postponed</option>
@@ -197,17 +191,18 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
 /************ CONFIG ************/
+// Change these 3 to your environment
 var ORIGIN    = "https://plantwiz.pimateck.in";
 var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
 var JWT       = new URLSearchParams(location.search).get("token")  || "";
 
-// Rule-chain flags
+// Flags (used by rule-chain)
 var ATTR_MS_SAVE    = "MS_Save_Button";      // false on CREATE
-var ATTR_MS_UPDATE  = "MS_Update_Buttton";   // true on UPDATE/CANCEL
+var ATTR_MS_UPDATE  = "MS_Update_Buttton";   // true on UPDATE/CANCEL (your spelling)
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp"; // base ts to rewrite
 
-// Telemetry keys to read
+// Telemetry keys we read
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
@@ -247,7 +242,6 @@ var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
-  taskList: [],
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: []
 };
@@ -393,7 +387,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false;
+    body[ATTR_MS_SAVE] = false; // trigger create path
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -409,8 +403,6 @@ function writeAttributes(payload, opts){
 function showDetails(ev){
   state.selectedEvent = ev;
   var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
-  var tasks = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
-
   $("#details").className = "";
   $("#details").innerHTML =
     '<div class="kpi">'+
@@ -421,17 +413,19 @@ function showDetails(ev){
       '<span>Priority</span><span>'+escapeHtml(String(p.MS_Priority??""))+'</span>'+
       '<span>Status</span><span>'+escapeHtml(p.MS_Status||"Planned")+'</span>'+
       '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
+      '<span>Tasks</span><span>'+escapeHtml(p.MS_Task||"-")+'</span>'+
       '<span>Start</span><span>'+fmt(p.MS_Start)+'</span>'+
       '<span>End</span><span>'+fmt(p.MS_End)+'</span>'+
       '<span>Description</span><span>'+escapeHtml(p.MS_Description||"-")+'</span>'+
-      '<span>Tasks</span><span>'+ (tasks.length?('<ul style="margin:6px 0;padding-left:18px">'+tasks.map(t=>'<li>'+escapeHtml(t)+'</li>').join('')+'</ul>'):'-') +'</span>'+
     '</div>';
   $("#sideActions").style.display = "flex";
 }
 
-/************ MODAL: TECH + TASK CHIPS ************/
+/************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
-function busy(on){ ["saveTask","btnCancel","btnEdit","btnNew"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; }); }
+function busy(on){
+  ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
+}
 function refreshTechChips(){
   var box=$("#techChips"); box.innerHTML="";
   state.technicians.forEach(function(name, idx){
@@ -448,22 +442,6 @@ function addOneTech(){
 }
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
-
-function refreshTaskChips(){
-  var box=$("#taskChips"); box.innerHTML="";
-  state.taskList.forEach(function(task, idx){
-    var chip=document.createElement("span"); chip.className="chip";
-    chip.innerHTML='<span>'+escapeHtml(task)+'</span><button type="button" aria-label="Remove">✕</button>';
-    chip.querySelector("button").addEventListener("click", function(){ state.taskList.splice(idx,1); refreshTaskChips(); });
-    box.appendChild(chip);
-  });
-}
-function addOneTask(){
-  var v=($("#taskOne").value||"").trim(); if(!v) return;
-  state.taskList.push(v); $("#taskOne").value=""; refreshTaskChips();
-}
-$("#addTaskBtn").addEventListener("click", addOneTask);
-$("#taskOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTask(); } });
 
 $("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
@@ -485,10 +463,10 @@ $("#btnEdit").addEventListener("click", function(){
   $("#fTimeStart").value= pad2(new Date(p.MS_Start).getHours())+":"+pad2(new Date(p.MS_Start).getMinutes());
   $("#fTimeEnd").value  = pad2(new Date(p.MS_End).getHours())+":"+pad2(new Date(p.MS_End).getMinutes());
   state.technicians     = (p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
-  state.taskList        = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
-  refreshTechChips(); refreshTaskChips(); $("#techOne").value=""; $("#taskOne").value="";
+  refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value   = p.MS_Status || "Planned";
   $("#fDesc").value     = p.MS_Description || "";
+  $("#fTasks").value    = p.MS_Task || "";
 
   overlay.style.display="flex";
 });
@@ -534,9 +512,9 @@ function openModalForDate(jsDate){
   $("#fPriority").value="3";
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
-  state.technicians=[]; state.taskList=[]; refreshTechChips(); refreshTaskChips();
-  $("#techOne").value=""; $("#taskOne").value="";
+  state.technicians=[]; refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
+  $("#fTasks").value="";
   overlay.style.display="flex";
 }
 function collectPayload(){
@@ -554,7 +532,7 @@ function collectPayload(){
     MS_Status: $("#fStatus").value || "Planned",
     MS_Description: ($("#fDesc").value||"").trim(),
     MS_Technicians: state.technicians.join(", "),
-    MS_Task: state.taskList.join(", ")
+    MS_Task: ($("#fTasks").value||"").trim()
   };
 }
 function validatePayload(p){
@@ -591,20 +569,129 @@ function onUpdate(){
       overlay.style.display="none";
       startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
         var p = found.extendedProps || {};
-        var titleOk = String(p.MS_Title||"") === String(payload.MS_Title||"");
-        var machOk  = String(p.MS_Machine||"") === String(payload.MS_Machine||"");
-        var typeOk  = String(p.MS_Type||"") === String(payload.MS_Type||"");
-        var priOk   = String(p.MS_Priority) === String(payload.MS_Priority);
-        var stOk    = String(p.MS_Status||"") === String(payload.MS_Status||"");
-        var sOk     = Number(p.MS_Start||0) === Number(payload.MS_Start||0);
-        var eOk     = Number(p.MS_End||0)   === Number(payload.MS_End||0);
-        var techOk  = String(p.MS_Technicians||"") === String(payload.MS_Technicians||"");
-        var taskOk  = String(p.MS_Task||"") === String(payload.MS_Task||"");
-        return titleOk && machOk && typeOk && priOk && stOk && sOk && eOk && techOk && taskOk;
+        var ok = String(p.MS_Title)==String(payload.MS_Title)
+          && String(p.MS_Machine)==String(payload.MS_Machine)
+          && String(p.MS_Type)==String(payload.MS_Type)
+          && String(p.MS_Priority)==String(payload.MS_Priority)
+          && String(p.MS_Status)==String(payload.MS_Status)
+          && Number(p.MS_Start)==Number(payload.MS_Start)
+          && Number(p.MS_End)==Number(payload.MS_End)
+          && String(p.MS_Technicians)==String(payload.MS_Technicians)
+          && String(p.MS_Task)==String(payload.MS_Task);
+        return ok;
       });
     })
     .catch(function(e){ console.error(e); alert(e.message||"Failed to update"); })
     .finally(function(){ busy(false); });
+}
+
+/************ REPORT (Generate Task PDF) ************/
+function openReportForSelected(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  const p = state.selectedEvent.extendedProps || {};
+  const ms = {
+    ReportNo: (p.MS_Date?new Date(p.MS_Date).toISOString().slice(0,10):"") + " / " + (p.__ts||""),
+    __ts: p.__ts,
+    MS_Title: p.MS_Title, MS_Machine: p.MS_Machine, MS_Type: p.MS_Type,
+    MS_Priority: p.MS_Priority, MS_Status: p.MS_Status,
+    MS_Date: p.MS_Date, MS_Start: p.MS_Start, MS_End: p.MS_End,
+    MS_Technicians: p.MS_Technicians, MS_Description: p.MS_Description,
+    MS_Task: p.MS_Task
+  };
+  const html = buildReportHTML(ms);
+  const blob = new Blob([html], {type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+}
+$("#btnPDF").addEventListener("click", openReportForSelected);
+
+// returns full HTML string of the report page (uses PlantwizLogo.png & PimaLogo.png from same folder)
+function buildReportHTML(ms){
+  const safe = s => String(s??"").replace(/[&<>\"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Maintenance Task Report</title>
+  <style>
+    :root{--ink:#0f172a;--muted:#475569;--ring:#e5e7eb;--soft:#f8fafc;--banner:#111827}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    .page{max-width:900px;margin:18px auto; padding:18px;border:1px solid var(--ring);border-radius:12px}
+    .header{display:grid;grid-template-columns:140px 1fr 140px;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:2px solid var(--ring)}
+    .header img{max-width:120px;max-height:48px;object-fit:contain}
+    .brand{text-align:center}
+    .brand h1{margin:0;font-size:18px;font-weight:900}
+    .brand .addr{color:var(--muted);font-size:12px;margin-top:2px}
+    .meta{font-weight:700;font-size:11px;text-align:right}
+    .banner{margin:14px 0 8px;background:linear-gradient(90deg,var(--banner),#1f2937 60%,#111827);color:#fff;border-radius:10px;padding:8px 12px;font-weight:900;letter-spacing:.2px}
+    .grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin-bottom:8px}
+    .card{border:1px solid var(--ring); border-radius:10px; background:#fff; padding:10px}
+    .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 8px;font-size:13px}
+    .kv span:first-child{color:var(--muted);font-weight:700}
+    table{width:100%;border-collapse:separate;border-spacing:0;margin:8px 0 14px}
+    th,td{border:1px solid var(--ring);padding:8px;vertical-align:top}
+    th{background:var(--soft);text-align:left;font-weight:800}
+    .small{font-size:12px;color:var(--muted)}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+    .sign .box{height:64px;border:1px dashed var(--ring);border-radius:10px}
+    .sign label{display:block;margin-top:4px;font-weight:700}
+    @page{size:A4;margin:14mm}
+    @media print{.actions{display:none} body{background:#fff} .page{border:0;margin:0;padding:0} footer{position:fixed;bottom:0;left:0;right:0} footer .pageno:after{content:counter(page) " / " counter(pages)}}
+    footer{margin-top:10px;padding-top:8px;border-top:1px solid var(--ring);display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
+    .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-weight:800;font-size:11px}
+  </style></head>
+  <body><div class="page">
+    <div class="header">
+      <img src="PlantwizLogo.png" alt="PlantWiz">
+      <div class="brand"><h1>Pima Controls Pvt. Ltd</h1><div class="addr">Block No.298, Nr. Bacha Motors, Sanathal Cross Road, Ahmedabad (382210)</div></div>
+      <div style="text-align:right"><img src="PimaLogo.png" alt="Pima"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 2px">
+      <div style="font-size:20px;font-weight:900">Maintenance Task Report</div>
+      <div class="meta">
+        <div>Report No.: <span>${safe(ms.ReportNo)||"—"}</span></div>
+        <div>Generated: <span>${new Date().toLocaleString()}</span></div>
+      </div>
+    </div>
+    <div class="banner">Task Summary</div>
+    <div class="grid">
+      <div class="card"><div class="kv">
+        <span>Title</span><span>${safe(ms.MS_Title)||"—"}</span>
+        <span>Machine / Asset</span><span>${safe(ms.MS_Machine)||"—"}</span>
+        <span>Type</span><span>${safe(ms.MS_Type)||"—"}</span>
+        <span>Priority</span><span><span class="badge">${safe(ms.MS_Priority??"—")}</span></span>
+        <span>Status</span><span>${safe(ms.MS_Status)||"—"}</span>
+      </div></div>
+      <div class="card"><div class="kv">
+        <span>Scheduled Date</span><span>${ms.MS_Date? new Date(ms.MS_Date).toLocaleDateString(): "—"}</span>
+        <span>Start</span><span>${ms.MS_Start? new Date(ms.MS_Start).toLocaleTimeString(): "—"}</span>
+        <span>End</span><span>${ms.MS_End? new Date(ms.MS_End).toLocaleTimeString(): "—"}</span>
+        <span>Duration</span><span>${
+          (ms.MS_Start&&ms.MS_End)?(function(){let mins=Math.max(0,Math.round((ms.MS_End-ms.MS_Start)/60000));return Math.floor(mins/60)+'h '+(mins%60)+'m'})():"—"}</span>
+      </div></div>
+      <div class="card"><div class="kv">
+        <span>Technicians</span><span>${safe(ms.MS_Technicians)||"—"}</span>
+        <span>Report ID TS</span><span class="small">${safe(ms.__ts||"—")}</span>
+      </div></div>
+    </div>
+    <div class="banner">Description / Notes</div>
+    <div class="card">${safe(ms.MS_Description)||"—"}</div>
+    <div class="banner">Checklist</div>
+    <table><thead><tr><th style="width:44px">#</th><th>Task Item</th><th style="width:70px">Done</th><th>Remarks</th><th style="width:140px">Checked By</th><th style="width:92px">Time</th></tr></thead>
+      <tbody>${
+        (String(ms.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean).map((t,i)=>`<tr><td>${i+1}</td><td>${safe(t)}</td><td>☐</td><td></td><td></td><td></td></tr>`).join(""))
+        || `<tr><td>1</td><td>No tasks provided</td><td>☐</td><td></td><td></td><td></td></tr>`
+      }</tbody>
+    </table>
+    <div class="banner">Approvals</div>
+    <div class="sign">
+      <div><div class="box"></div><label>Technician Sign &amp; Date</label></div>
+      <div><div class="box"></div><label>Supervisor Sign &amp; Date</label></div>
+    </div>
+    <footer><div>Generated by Maintenance Scheduler</div><div class="pageno">Page </div></footer>
+  </div>
+  <div class="actions" style="max-width:900px;margin:8px auto 24px;display:flex;gap:8px;justify-content:flex-end">
+    <button onclick="window.print()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-weight:800;cursor:pointer">Download PDF</button>
+  </div>
+  </body></html>`;
 }
 
 /************ BOOT ************/
