@@ -69,7 +69,7 @@
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
-  /* ------- REPORT styles (printed to PDF) ------- */
+  /* ------- REPORT styles ------- */
   #msReport{display:none; font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial; color:#0f172a}
   .r-wrap{width:794px; padding:16px; margin:0 auto; background:#fff}
   .r-flex{display:flex; align-items:center; justify-content:space-between}
@@ -131,10 +131,7 @@
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
       <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
       <button class="btn primary" id="btnNew"    type="button">New</button>
-
-      <!-- Report actions -->
-      <button class="btn primary" id="btnReportPreview"  type="button">Generate PDF</button>
-      <button class="btn ghost"   id="btnReportDownload" type="button">Download PDF</button>
+      <button class="btn primary" id="btnReportDownload" type="button">Download PDF</button>
     </div>
   </aside>
 </div>
@@ -214,10 +211,9 @@
   </div>
 </div>
 
-<!-- ------- Report HTML (hidden; used for PDF) ------- -->
+<!-- Report HTML (hidden; used for PDF) -->
 <div id="msReport">
   <div class="r-wrap">
-    <!-- Header -->
     <div class="r-flex mb8">
       <img src="PlantwizLogo.png" class="r-logo" alt="PlantWiz">
       <div style="text-align:center">
@@ -235,7 +231,6 @@
       </div>
     </div>
 
-    <!-- Summary -->
     <div class="r-banner mb8">Task Summary</div>
     <div class="r-grid mb12">
       <div class="r-card">
@@ -257,11 +252,9 @@
       </div>
     </div>
 
-    <!-- Description -->
     <div class="r-banner mb8">Description / Notes</div>
     <div class="r-box mb12" id="rDesc">—</div>
 
-    <!-- Checklist -->
     <div class="r-banner mb8">Checklist</div>
     <table class="r-table mb12" id="rChecklist">
       <thead>
@@ -270,7 +263,6 @@
       <tbody></tbody>
     </table>
 
-    <!-- Approvals -->
     <div class="r-banner mb8">Approvals</div>
     <div class="r-approvals">
       <div class="r-sign"><div class="r-muted">Technician Sign & Date</div></div>
@@ -287,18 +279,17 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
 /************ CONFIG ************/
-// Change these 3 to your environment
 var ORIGIN    = "https://plantwiz.pimateck.in";
 var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
 var JWT       = new URLSearchParams(location.search).get("token")  || "";
 
-// Flags (used by rule-chain)
-var ATTR_MS_SAVE    = "MS_Save_Button";      // false on CREATE
-var ATTR_MS_UPDATE  = "MS_Update_Buttton";   // true on UPDATE/CANCEL (your spelling)
-var ATTR_MS_UPD_TS  = "MS_Update_Timestamp"; // base ts to rewrite
+// Flags (rule chain)
+var ATTR_MS_SAVE    = "MS_Save_Button";
+var ATTR_MS_UPDATE  = "MS_Update_Buttton";
+var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Telemetry keys we read
+// Telemetry keys
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
@@ -336,15 +327,14 @@ function eventContent(arg){
 /************ STATE ************/
 var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
-  // for modal
   pickedDate: null,
   technicians: [],
-  // filters
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: []
 };
 
-/************ READ ************/
+/************ READ / FILTERS / AUTO-REFRESH ************/
+// (Same as your last working version; omitted comments for brevity)
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -396,8 +386,6 @@ function readRange(rangeStart, rangeEnd){
     });
 }
 
-/************ FILTERS ************/
-// (unchanged from your last working version)
 function populateFilters(events){
   var mas = new Set(), techs = new Set();
   events.forEach(ev=>{
@@ -439,7 +427,6 @@ $("#btnResetFilters").addEventListener("click", function(){
   loading("Loaded "+state.lastEventsFull.length+" task(s)");
 });
 
-/************ AUTO-REFRESH (5s, 3 min max) ************/
 var _autoTimer=null, _autoDeadline=0;
 function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
 function startAutoRefresh(expectedTs, predicate){
@@ -468,7 +455,7 @@ function startAutoRefresh(expectedTs, predicate){
   }, 5000);
 }
 
-/************ WRITE ************/
+/************ WRITE / DETAILS / MODAL (same as earlier) ************/
 function writeAttributes(payload, opts){
   if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
@@ -486,7 +473,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false; // trigger create path
+    body[ATTR_MS_SAVE] = false;
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -498,7 +485,6 @@ function writeAttributes(payload, opts){
   }).then(res=>res.ok?null:res.text().then(t=>{throw new Error("Attribute write failed: "+t);})); 
 }
 
-/************ DETAILS ************/
 function showDetails(ev){
   state.selectedEvent = ev;
   var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
@@ -520,10 +506,9 @@ function showDetails(ev){
   $("#sideActions").style.display = "flex";
 }
 
-/************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
 function busy(on){
-  ["saveTask","btnCancel","btnEdit","btnNew","btnReportPreview","btnReportDownload"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
+  ["saveTask","btnCancel","btnEdit","btnNew","btnReportDownload"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
 }
 function refreshTechChips(){
   var box=$("#techChips"); box.innerHTML="";
@@ -616,7 +601,7 @@ function openModalForDate(jsDate){
   overlay.style.display="flex";
 }
 function collectPayload(){
-  var dateStr = $("#fDate").value; // yyyy-mm-dd
+  var dateStr = $("#fDate").value;
   var parts = dateStr ? dateStr.split("-").map(Number) : null;
   var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
   return {
@@ -683,14 +668,12 @@ function onUpdate(){
     .finally(function(){ busy(false); });
 }
 
-/************ REPORT FILL ************/
+/************ REPORT: fill + safe download (no blank PDFs) ************/
 function renderReportFrom(event){
   var p = event.extendedProps || {};
-  // Header info
   $("#repNo").textContent  = "Report No: " + String(p.__ts||"-");
   $("#repGen").textContent = "Generated: " + new Date().toLocaleString();
 
-  // Summary
   $("#rTitle").textContent   = p.MS_Title || "-";
   $("#rMachine").textContent = p.MS_Machine || "-";
   $("#rType").textContent    = p.MS_Type || "-";
@@ -709,7 +692,6 @@ function renderReportFrom(event){
   $("#rBaseTs").textContent = String(p.__ts || "-");
   $("#rDesc").textContent = p.MS_Description || "-";
 
-  // Checklist from MS_Task
   var body = document.querySelector("#rChecklist tbody");
   body.innerHTML = "";
   var items = String(p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
@@ -725,7 +707,6 @@ function renderReportFrom(event){
   });
 }
 
-/************ PDF PREVIEW & DOWNLOAD ************/
 function preloadImagesIn(el){
   const imgs = el.querySelectorAll('img');
   return Promise.all(Array.from(imgs).map(img => (
@@ -741,22 +722,29 @@ const PDF_OPTS = {
   jsPDF: { unit:'mm', format:'a4', orientation:'portrait' },
   pagebreak: { mode:['css','legacy'] }
 };
-async function openMaintenancePdfPreview(){
-  if(!state.selectedEvent){ alert("Select a task first."); return; }
-  renderReportFrom(state.selectedEvent);
-  const el = document.getElementById('msReport');
-  await preloadImagesIn(el);
-  const url = await html2pdf().set(PDF_OPTS).from(el).outputPdf('bloburl');
-  window.open(url, '_blank');
-}
+
+// Only download (no preview). Clone the hidden report, show the clone off-screen so html2pdf can render it.
 async function downloadMaintenancePdf(){
   if(!state.selectedEvent){ alert("Select a task first."); return; }
   renderReportFrom(state.selectedEvent);
-  const el = document.getElementById('msReport');
-  await preloadImagesIn(el);
-  html2pdf().set(PDF_OPTS).from(el).save();
+
+  const source = document.getElementById('msReport');
+  const clone  = source.cloneNode(true);
+  clone.id = 'msReportClone';
+  clone.style.display   = 'block';
+  clone.style.position  = 'fixed';
+  clone.style.left      = '-10000px';
+  clone.style.top       = '0';
+  document.body.appendChild(clone);
+
+  await preloadImagesIn(clone);
+  const title = (state.selectedEvent.extendedProps.MS_Title||'Maintenance_Task').replace(/[^\w\-]+/g,'_');
+  const ts    = state.selectedEvent.extendedProps.__ts || Date.now();
+  const opts  = Object.assign({}, PDF_OPTS, { filename: `${title}_${ts}.pdf` });
+
+  await html2pdf().set(opts).from(clone).save();
+  clone.remove();
 }
-document.getElementById('btnReportPreview').addEventListener('click', openMaintenancePdfPreview);
 document.getElementById('btnReportDownload').addEventListener('click', downloadMaintenancePdf);
 
 /************ BOOT ************/
@@ -798,7 +786,6 @@ function startCalendar(){
   });
   state.calendar.render();
 
-  // Legends on toolbar right
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
