@@ -1,111 +1,634 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Maintenance Scheduler</title>
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet"/>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #calendar { max-width: 1100px; margin: 40px auto; }
-    .top-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
-    button { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
-    .btn-primary { background: #007bff; color: white; }
-    .btn-danger { background: #dc3545; color: white; }
-    .btn-secondary { background: #6c757d; color: white; }
-    #tipsPanel, #listViewPanel, #missedPanel { display: none; max-width: 1100px; margin: 20px auto; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-    .popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-    .popup-content { background: white; padding: 20px; border-radius: 8px; width: 300px; text-align: center; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Maintenance Scheduler</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<style>
+  :root{--ring:#e5e7eb;--bg:#fff;--text:#0f172a;--muted:#64748b;
+        --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#374151;--gray:#6b7280}
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .app{display:grid;grid-template-columns:1fr 320px;gap:16px;min-height:100vh;padding:16px}
+  header{grid-column:1/-1;display:flex;gap:10px;align-items:center;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
+  .spacer{flex:1}
+  .btn,.input,textarea,select{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:8px 10px}
+  .btn{cursor:pointer;font-weight:800}
+  .btn.primary{background:linear-gradient(#3b82f6,#2563eb);color:#fff;border:0}
+  .btn.danger{border-color:var(--red);color:#dc2626}
+  .btn.ghost{border-color:var(--ring);color:#0f172a}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
+  #calendar{min-height:560px}
+  .side{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;position:sticky;top:16px;height:fit-content}
+  .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
+  .h6{margin:0 0 10px;font-weight:900}
+  .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
+  .kpi span:first-child{color:#64748b}
+  .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+  .filters{grid-column:1/-1;display:flex;align-items:center;gap:10px;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
+  .filters label{font-size:12px;color:#64748b;margin-right:4px}
+
+  .fc .fc-toolbar{padding:10px}
+  .fc .fc-toolbar-title{font-size:16px;font-weight:800}
+  .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
+  .fc-theme-standard td,.fc-theme-standard th{border-color:var(--ring)}
+  .fc-daygrid-day-number{color:#64748b}
+
+  .event{border-radius:10px;border:0;padding:6px 8px;color:#fff;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
+  .status-planned{background:var(--blue)}
+  .status-inprogress{background:var(--amber)}
+  .status-completed{background:var(--green)}
+  .status-cancelled{background:var(--red)}
+  .status-postponed{background:var(--gray)}
+  .muted{color:#64748b}
+  #loading{font-size:12px;color:#64748b;margin-left:8px}
+
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{width:min(640px,92vw);background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.18)}
+  .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
+  .modal .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .modal .row-full{grid-column:1 / -1}
+  .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
+  .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
+  .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;line-height:1}
+
+  .fc-toolbar-chunk.legends{display:flex;gap:14px;align-items:center;margin-left:8px}
+  .legend-box{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px}
+  .legend-planned{background:var(--blue)}
+  .legend-inprogress{background:var(--amber)}
+  .legend-completed{background:var(--green)}
+  .legend-cancelled{background:var(--red)}
+  .legend-postponed{background:var(--gray)}
+</style>
 </head>
 <body>
+<div class="app">
+  <header>
+    <div class="spacer"></div>
+    <span id="loading"></span>
+  </header>
 
-  <h2 style="text-align:center;">🛠️ Maintenance Scheduler</h2>
+  <!-- Filters -->
+  <div class="filters">
+    <label>Machine</label>
+    <select id="filtMa" class="input" style="min-width:140px"><option value="__ALL__">All</option></select>
 
-  <div class="top-bar">
-    <button class="btn-primary" onclick="showPanel('tipsPanel')">Show Tips</button>
-    <button class="btn-secondary" onclick="showPanel('listViewPanel')">List View</button>
-    <button class="btn-danger" onclick="showPanel('missedPanel')">Missed Maintenance</button>
+    <label>Type</label>
+    <select id="filtTy" class="input" style="min-width:140px">
+      <option value="__ALL__">All</option>
+      <option>Preventive</option><option>Corrective</option><option>Calibration</option><option>Inspection</option><option>Others</option>
+    </select>
+
+    <label>Status</label>
+    <select id="filtSt" class="input" style="min-width:140px">
+      <option value="__ALL__">All</option>
+      <option>Planned</option><option>In-Progress</option><option>Completed</option><option>Cancelled</option><option>Postponed</option>
+    </select>
+
+    <label>Technician</label>
+    <select id="filtTech" class="input" style="min-width:140px"><option value="__ALL__">All</option></select>
+
+    <button class="btn ghost" id="btnApplyFilters" type="button">Update</button>
+    <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <div id="calendar"></div>
+  <div class="card"><div id="calendar"></div></div>
 
-  <!-- Tips Panel -->
-  <div id="tipsPanel">
-    <h3>Maintenance Tips</h3>
-    <ul>
-      <li>Lubricate Motor A in 20 hrs (MTBF = 150 hrs).</li>
-      <li>Schedule Pump B downtime at night (MTTR = 4 hrs).</li>
-      <li>CNC-01 overdue lubrication by 100 cycles (High Risk).</li>
-      <li>Calibration due in 7 days for Flow Meter #2.</li>
-    </ul>
-  </div>
-
-  <!-- List View -->
-  <div id="listViewPanel">
-    <h3>Maintenance List</h3>
-    <table>
-      <tr><th>Machine</th><th>Type</th><th>Due Date</th><th>Status</th></tr>
-      <tr><td>Pump A</td><td>Preventive</td><td>2025-09-12</td><td>Planned</td></tr>
-      <tr><td>Motor B</td><td>Corrective</td><td>2025-09-13</td><td>Pending</td></tr>
-      <tr><td>CNC-01</td><td>Breakdown</td><td>2025-09-10</td><td>Completed</td></tr>
-    </table>
-  </div>
-
-  <!-- Missed Maintenance -->
-  <div id="missedPanel">
-    <h3>Missed Maintenance</h3>
-    <table>
-      <tr><th>Machine</th><th>Type</th><th>Missed By</th><th>Priority</th></tr>
-      <tr><td>Pump B</td><td>Preventive</td><td>5 days</td><td>High</td></tr>
-      <tr><td>Fan-03</td><td>Corrective</td><td>3 days</td><td>Medium</td></tr>
-    </table>
-  </div>
-
-  <!-- Popup -->
-  <div id="popup" class="popup">
-    <div class="popup-content">
-      <p>Do you want to generate the Maintenance Completion Report?</p>
-      <button onclick="generateReport()">Yes</button>
-      <button onclick="closePopup()">No</button>
+  <aside class="side">
+    <h3 class="h6">Maintenance task</h3>
+    <div id="details" class="empty">Select a task on the calendar</div>
+    <div class="side-actions" id="sideActions" style="display:none">
+      <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
+      <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
+      <button class="btn primary" id="btnNew"    type="button">New</button>
     </div>
+  </aside>
+</div>
+
+<!-- Create/Update Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <header>
+      <div style="font-weight:900" id="modalTitle">Add maintenance task</div>
+      <button class="btn" id="closeModal" type="button">Close</button>
+    </header>
+    <div class="body">
+      <div class="row-full">
+        <label>Title</label>
+        <input id="fTitle" class="input" type="text" placeholder="e.g., Quarterly Service">
+      </div>
+
+      <div>
+        <label>Machine</label>
+        <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
+      </div>
+      <div>
+        <label>Type</label>
+        <select id="fType" class="input">
+          <option>Preventive</option><option>Corrective</option><option>Calibration</option><option>Inspection</option><option>Others</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Priority (1=High)</label>
+        <select id="fPriority" class="input">
+          <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+        </select>
+      </div>
+      <div>
+        <label>Date</label>
+        <input id="fDate" class="input" type="date">
+      </div>
+
+      <div>
+        <label>Start</label>
+        <input id="fTimeStart" class="input" type="time" value="09:00">
+      </div>
+      <div>
+        <label>End</label>
+        <input id="fTimeEnd" class="input" type="time" value="11:00">
+      </div>
+
+      <div class="row-full">
+        <label>Technician(s)</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="techOne" class="input" type="text" placeholder="Type a name and click +">
+          <button class="btn ghost" id="addTechBtn" type="button">+</button>
+        </div>
+        <div id="techChips" class="chips"></div>
+      </div>
+
+      <div>
+        <label>Status</label>
+        <select id="fStatus" class="input">
+          <option>Planned</option><option>In-Progress</option><option>Completed</option><option>Cancelled</option><option>Postponed</option>
+        </select>
+      </div>
+      <div class="row-full">
+        <label>Description</label>
+        <textarea id="fDesc" class="input" rows="2" placeholder="Optional notes"></textarea>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="saveTask" type="button">Save</button>
+    </footer>
   </div>
+</div>
 
-  <script>
-    function showPanel(id) {
-      document.getElementById("tipsPanel").style.display = "none";
-      document.getElementById("listViewPanel").style.display = "none";
-      document.getElementById("missedPanel").style.display = "none";
-      document.getElementById(id).style.display = "block";
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+/************ CONFIG ************/
+// Change these 3 to your environment
+var ORIGIN    = "https://plantwiz.pimateck.in";
+var API_BASE  = ORIGIN + "/api";
+var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
+var JWT       = new URLSearchParams(location.search).get("token")  || "";
+
+// Flags (used by rule-chain)
+var ATTR_MS_SAVE    = "MS_Save_Button";      // false on CREATE
+var ATTR_MS_UPDATE  = "MS_Update_Buttton";   // true on UPDATE/CANCEL (your spelling)
+var ATTR_MS_UPD_TS  = "MS_Update_Timestamp"; // base ts to rewrite
+
+// Telemetry keys we read
+var KEYS = [
+  "MS_Title","MS_Machine","MS_Type","MS_Priority",
+  "MS_Date","MS_Start","MS_End",
+  "MS_Status","MS_Description","MS_Technicians"
+];
+
+/************ HELPERS ************/
+function $(s){ return document.querySelector(s); }
+function loading(t){ $("#loading").textContent = t || ""; }
+function escapeHtml(s){ return String(s||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function hhmmToMs(baseDate, hhmm){
+  var p = String(hhmm||"00:00").split(":"); var h=+p[0]||0, m=+p[1]||0;
+  var d = new Date(baseDate); d.setHours(h,m,0,0); return d.getTime();
+}
+function msToHHMM(ms){
+  var d = new Date(ms), h = d.getHours()%12 || 12, ampm = d.getHours()>=12?"PM":"AM";
+  return pad2(h)+":"+pad2(d.getMinutes())+" "+ampm;
+}
+function colorByStatus(s){
+  var v = String(s||"Planned").toLowerCase();
+  if (v==="cancelled") return "status-cancelled";
+  if (v==="in-progress" || v==="inprogress") return "status-inprogress";
+  if (v==="completed") return "status-completed";
+  if (v==="postponed") return "status-postponed";
+  return "status-planned";
+}
+function eventContent(arg){
+  var p = arg.event.extendedProps;
+  var time = msToHHMM(p.MS_Start);
+  var title = p.MS_Title || "Maintenance";
+  return { html: '<span>'+escapeHtml(time)+' — '+escapeHtml(title)+'</span>' };
+}
+
+/************ STATE ************/
+var state = {
+  calendar:null, lastRange:null, selectedEvent:null, mode:"create",
+  // for modal
+  pickedDate: null,
+  technicians: [],
+  // filters
+  filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
+  lastEventsFull: []
+};
+
+/************ READ ************/
+function readRange(rangeStart, rangeEnd){
+  if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
+  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
+          + "?keys=" + encodeURIComponent(KEYS.join(",")) +
+            "&startTs=" + rangeStart.getTime() +
+            "&endTs="   + rangeEnd.getTime() +
+            "&limit=5000";
+  return fetch(url, { headers: { "X-Authorization": "Bearer " + JWT } })
+    .then(res => res.ok ? res.json() : res.text().then(t => { throw new Error("Timeseries read failed: "+t); }))
+    .then(tsObj => {
+      var map = {};
+      Object.keys(tsObj || {}).forEach(k => {
+        (tsObj[k]||[]).forEach(p => {
+          var ts = Number(p.ts);
+          var rec = map[ts] || (map[ts] = { ts: ts });
+          rec[k] = p.value;
+        });
+      });
+      var out = [];
+      Object.keys(map).forEach(tsStr => {
+        var r = map[tsStr];
+        var st = Number(r.MS_Start || r.ts);
+        var en = Number(r.MS_End || (st + 60*60*1000));
+        if (!st || !en) return;
+        out.push({
+          id: "ts-"+r.ts,
+          title: r.MS_Title || "Maintenance",
+          start: new Date(st),
+          end:   new Date(en),
+          classNames: ["event", colorByStatus(r.MS_Status)],
+          extendedProps: {
+            MS_Title: r.MS_Title || "",
+            MS_Machine: r.MS_Machine || "",
+            MS_Type: r.MS_Type || "Preventive",
+            MS_Priority: r.MS_Priority != null ? r.MS_Priority : 3,
+            MS_Date: r.MS_Date || null,
+            MS_Start: st,
+            MS_End: en,
+            MS_Status: r.MS_Status || "Planned",
+            MS_Description: r.MS_Description || "",
+            MS_Technicians: r.MS_Technicians || "",
+            __ts: r.ts
+          }
+        });
+      });
+      out.sort((a,b)=>a.start-b.start);
+      return out;
+    });
+}
+
+/************ FILTERS ************/
+function populateFilters(events){
+  var mas = new Set(), techs = new Set();
+  events.forEach(ev=>{
+    var p = ev.extendedProps||{};
+    if (p.MS_Machine) mas.add(String(p.MS_Machine));
+    if (p.MS_Technicians){
+      String(p.MS_Technicians).split(",").map(s=>s.trim()).filter(Boolean).forEach(t=>techs.add(t));
     }
+  });
+  function fill(sel, set){
+    var el = $(sel); var val = el.value || "__ALL__";
+    el.innerHTML = '<option value="__ALL__">All</option>' +
+      Array.from(set).sort().map(v=>'<option>'+escapeHtml(v)+'</option>').join('');
+    if ([...set].includes(val)) el.value = val; else el.value="__ALL__";
+  }
+  fill("#filtMa", mas); fill("#filtTech", techs);
+}
+function applyFilters(events){
+  var ma=$("#filtMa").value, ty=$("#filtTy").value, st=$("#filtSt").value, tech=$("#filtTech").value;
+  state.filters = { ma, ty, st, tech };
+  return events.filter(ev=>{
+    var p = ev.extendedProps||{};
+    var okMa = (ma==="__ALL__" || String(p.MS_Machine)===ma);
+    var okTy = (ty==="__ALL__" || String(p.MS_Type)===ty);
+    var okSt = (st==="__ALL__" || String(p.MS_Status)===st);
+    var okTe = (tech==="__ALL__" || (p.MS_Technicians||"").split(",").map(s=>s.trim()).includes(tech));
+    return okMa && okTy && okSt && okTe;
+  });
+}
+$("#btnApplyFilters").addEventListener("click", function(){
+  var filtered = applyFilters(state.lastEventsFull);
+  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+  loading("Loaded "+filtered.length+" task(s)");
+});
+$("#btnResetFilters").addEventListener("click", function(){
+  $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
+  state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
+  state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull);
+  loading("Loaded "+state.lastEventsFull.length+" task(s)");
+});
 
-    function closePopup() { document.getElementById("popup").style.display = "none"; }
-    function generateReport() {
-      alert("✅ Maintenance Report Generated!");
-      closePopup();
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      var calendarEl = document.getElementById('calendar');
-      var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        events: [
-          { title: 'Pump A - Preventive', start: '2025-09-12', color: '#007bff' },
-          { title: 'Motor B - Corrective', start: '2025-09-13', color: '#ffc107' },
-          { title: 'CNC-01 - Breakdown', start: '2025-09-10', color: '#dc3545' }
-        ],
-        eventClick: function(info) {
-          if(confirm("Mark this task as completed?")) {
-            document.getElementById("popup").style.display = "flex";
+/************ AUTO-REFRESH (5s, 3 min max) ************/
+var _autoTimer=null, _autoDeadline=0;
+function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
+function startAutoRefresh(expectedTs, predicate){
+  stopAutoRefresh();
+  _autoDeadline = Date.now() + 3*60*1000;
+  _autoTimer = setInterval(function(){
+    if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped: timeout waiting for telemetry update"); return; }
+    if (!state.lastRange) return;
+    readRange(state.lastRange.start, state.lastRange.end)
+      .then(function(events){
+        state.lastEventsFull = events.slice();
+        populateFilters(events);
+        var filtered = applyFilters(events);
+        state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+        $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
+        loading("Loaded "+filtered.length+" task(s) — auto-refreshing…");
+        if (expectedTs!=null){
+          var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
+          if (found){
+            if (typeof predicate==="function"){ try{ if(predicate(found)){ stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){} }
+            else { stopAutoRefresh(); loading("Update detected ✓"); }
           }
         }
-      });
-      calendar.render();
-    });
-  </script>
+      })
+      .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
+  }, 5000);
+}
 
+/************ WRITE ************/
+function writeAttributes(payload, opts){
+  if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
+  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
+  var body = {
+    MS_Title: payload.MS_Title,
+    MS_Machine: payload.MS_Machine,
+    MS_Type: payload.MS_Type,
+    MS_Priority: payload.MS_Priority,
+    MS_Date: payload.MS_Date,
+    MS_Start: payload.MS_Start,
+    MS_End: payload.MS_End,
+    MS_Status: payload.MS_Status || "Planned",
+    MS_Description: payload.MS_Description || "",
+    MS_Technicians: payload.MS_Technicians || ""
+  };
+  if (opts && opts.mode==="create"){
+    body[ATTR_MS_SAVE] = false; // trigger create path
+  } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
+    body[ATTR_MS_UPDATE] = true;
+    if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
+  }
+  return fetch(url,{
+    method:"POST",
+    headers:{ "X-Authorization":"Bearer "+JWT, "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  }).then(res=>res.ok?null:res.text().then(t=>{throw new Error("Attribute write failed: "+t);})); 
+}
+
+/************ DETAILS ************/
+function showDetails(ev){
+  state.selectedEvent = ev;
+  var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
+  $("#details").className = "";
+  $("#details").innerHTML =
+    '<div class="kpi">'+
+      '<span>Base ts</span><span>'+escapeHtml(String(p.__ts||"-"))+'</span>'+
+      '<span>Title</span><span>'+escapeHtml(p.MS_Title||"-")+'</span>'+
+      '<span>Machine</span><span>'+escapeHtml(p.MS_Machine||"-")+'</span>'+
+      '<span>Type</span><span>'+escapeHtml(p.MS_Type||"-")+'</span>'+
+      '<span>Priority</span><span>'+escapeHtml(String(p.MS_Priority??""))+'</span>'+
+      '<span>Status</span><span>'+escapeHtml(p.MS_Status||"Planned")+'</span>'+
+      '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
+      '<span>Start</span><span>'+fmt(p.MS_Start)+'</span>'+
+      '<span>End</span><span>'+fmt(p.MS_End)+'</span>'+
+      '<span>Description</span><span>'+escapeHtml(p.MS_Description||"-")+'</span>'+
+    '</div>';
+  $("#sideActions").style.display = "flex";
+}
+
+/************ MODAL + TECH CHIPS ************/
+var overlay = $("#overlay");
+function busy(on){
+  ["saveTask","btnCancel","btnEdit","btnNew"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
+}
+function refreshTechChips(){
+  var box=$("#techChips"); box.innerHTML="";
+  state.technicians.forEach(function(name, idx){
+    var chip=document.createElement("span"); chip.className="chip";
+    chip.innerHTML='<span>'+escapeHtml(name)+'</span><button type="button" aria-label="Remove">✕</button>';
+    chip.querySelector("button").addEventListener("click", function(){ state.technicians.splice(idx,1); refreshTechChips(); });
+    box.appendChild(chip);
+  });
+}
+function addOneTech(){
+  var v=($("#techOne").value||"").trim(); if(!v) return;
+  if(state.technicians.includes(v)){ alert("Already added: "+v); return; }
+  state.technicians.push(v); $("#techOne").value=""; refreshTechChips();
+}
+$("#addTechBtn").addEventListener("click", addOneTech);
+$("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
+
+$("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
+$("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
+$("#saveTask").addEventListener("click", function(){ if (state.mode==="update") onUpdate(); else onCreate(); });
+
+$("#btnEdit").addEventListener("click", function(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  var p = state.selectedEvent.extendedProps;
+  state.mode="update"; $("#modalTitle").textContent="Update maintenance task"; $("#saveTask").textContent="Update";
+
+  var date = new Date(p.MS_Date || p.MS_Start);
+  state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  $("#fTitle").value    = p.MS_Title || "";
+  $("#fMachine").value  = p.MS_Machine || "";
+  $("#fType").value     = p.MS_Type || "Preventive";
+  $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
+  $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("#fTimeStart").value= pad2(new Date(p.MS_Start).getHours())+":"+pad2(new Date(p.MS_Start).getMinutes());
+  $("#fTimeEnd").value  = pad2(new Date(p.MS_End).getHours())+":"+pad2(new Date(p.MS_End).getMinutes());
+  state.technicians     = (p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
+  refreshTechChips(); $("#techOne").value="";
+  $("#fStatus").value   = p.MS_Status || "Planned";
+  $("#fDesc").value     = p.MS_Description || "";
+
+  overlay.style.display="flex";
+});
+
+$("#btnCancel").addEventListener("click", function(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  if(!confirm("Cancel this maintenance task?")) return;
+
+  var p = state.selectedEvent.extendedProps;
+  var payload = {
+    MS_Title: p.MS_Title || "",
+    MS_Machine: p.MS_Machine || "",
+    MS_Type: p.MS_Type || "Preventive",
+    MS_Priority: p.MS_Priority != null ? p.MS_Priority : 3,
+    MS_Date: p.MS_Date || null,
+    MS_Start: p.MS_Start,
+    MS_End: p.MS_End,
+    MS_Status: "Cancelled",
+    MS_Description: p.MS_Description || "",
+    MS_Technicians: p.MS_Technicians || ""
+  };
+  payload[ATTR_MS_UPD_TS] = p.__ts;
+
+  loading("Cancelling…"); busy(true);
+  writeAttributes(payload, { mode:"cancel" })
+    .then(function(){
+      startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
+        return String(found.extendedProps.MS_Status).toLowerCase()==="cancelled";
+      });
+    })
+    .catch(err=>{ console.error(err); alert(err.message||"Failed to cancel"); })
+    .finally(()=>{ busy(false); });
+});
+
+/************ CREATE / UPDATE ************/
+function openModalForDate(jsDate){
+  state.mode="create";
+  state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
+  $("#modalTitle").textContent="Add maintenance task"; $("#saveTask").textContent="Save";
+
+  $("#fTitle").value=""; $("#fMachine").value=""; $("#fType").value="Preventive";
+  $("#fPriority").value="3";
+  $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
+  state.technicians=[]; refreshTechChips(); $("#techOne").value="";
+  $("#fStatus").value="Planned"; $("#fDesc").value="";
+  overlay.style.display="flex";
+}
+function collectPayload(){
+  var dateStr = $("#fDate").value; // yyyy-mm-dd
+  var parts = dateStr ? dateStr.split("-").map(Number) : null;
+  var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
+  return {
+    MS_Title: ($("#fTitle").value||"").trim(),
+    MS_Machine: ($("#fMachine").value||"").trim(),
+    MS_Type: $("#fType").value || "Preventive",
+    MS_Priority: parseInt($("#fPriority").value, 10) || 3,
+    MS_Date: new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime(),
+    MS_Start: hhmmToMs(base, $("#fTimeStart").value),
+    MS_End:   hhmmToMs(base, $("#fTimeEnd").value),
+    MS_Status: $("#fStatus").value || "Planned",
+    MS_Description: ($("#fDesc").value||"").trim(),
+    MS_Technicians: state.technicians.join(", ")
+  };
+}
+function validatePayload(p){
+  var must = [
+    ["Title", p.MS_Title],
+    ["Machine", p.MS_Machine],
+    ["At least one technician", p.MS_Technicians]
+  ];
+  for (var i=0;i<must.length;i++){ if(!must[i][1]) return "Please enter "+must[i][0]; }
+  if (p.MS_End <= p.MS_Start) return "End time must be after Start time.";
+  return "";
+}
+function onCreate(){
+  var payload = collectPayload();
+  var err = validatePayload(payload); if (err){ alert(err); return; }
+  loading("Saving…"); busy(true);
+  writeAttributes(payload, { mode:"create" })
+    .then(function(){ overlay.style.display="none"; startAutoRefresh(payload.MS_Start, null); })
+    .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
+    .finally(function(){ busy(false); });
+}
+function onUpdate(){
+  if(!state.selectedEvent || !state.selectedEvent.extendedProps){ alert("No task selected for update."); return; }
+  var payload = collectPayload();
+  var baseTs = state.selectedEvent.extendedProps.__ts;
+  if(!baseTs){ alert("Missing base timestamp for update. Please reselect the task."); return; }
+  payload[ATTR_MS_UPD_TS] = baseTs;
+
+  var err = validatePayload(payload); if (err){ alert(err); return; }
+
+  loading("Updating…"); busy(true);
+  writeAttributes(payload, { mode:"update" })
+    .then(function(){
+      overlay.style.display="none";
+      startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
+        var p = found.extendedProps || {};
+        var titleOk = String(p.MS_Title||"") === String(payload.MS_Title||"");
+        var machOk  = String(p.MS_Machine||"") === String(payload.MS_Machine||"");
+        var typeOk  = String(p.MS_Type||"") === String(payload.MS_Type||"");
+        var priOk   = String(p.MS_Priority) === String(payload.MS_Priority);
+        var stOk    = String(p.MS_Status||"") === String(payload.MS_Status||"");
+        var sOk     = Number(p.MS_Start||0) === Number(payload.MS_Start||0);
+        var eOk     = Number(p.MS_End||0)   === Number(payload.MS_End||0);
+        var techOk  = String(p.MS_Technicians||"") === String(payload.MS_Technicians||"");
+        return titleOk && machOk && typeOk && priOk && stOk && sOk && eOk && techOk;
+      });
+    })
+    .catch(function(e){ console.error(e); alert(e.message||"Failed to update"); })
+    .finally(function(){ busy(false); });
+}
+
+/************ BOOT ************/
+function startCalendar(){
+  if (!window.FullCalendar){
+    document.getElementById('calendar').innerHTML =
+      '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
+  }
+  if (!JWT){
+    document.getElementById('calendar').innerHTML =
+      '<div class="empty"><span class="err">Missing JWT (?token=…)</span></div>'; return;
+  }
+  var calEl = $("#calendar");
+  state.calendar = new FullCalendar.Calendar(calEl, {
+    initialView: "dayGridMonth",
+    headerToolbar: { left: "prev,next today", center: "title", right: "" },
+    height: "auto",
+    eventContent: eventContent,
+    dateClick: function(info){ openModalForDate(info.date); },
+    eventClick: function(info){ showDetails(info.event); },
+    datesSet: function(info){
+      loading("Loading…");
+      state.lastRange = { start: info.start, end: info.end };
+      readRange(info.start, info.end)
+        .then(function(events){
+          state.lastEventsFull = events.slice();
+          populateFilters(events);
+          var filtered = applyFilters(events);
+          state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+          $("#details").className="empty"; $("#details").textContent="Select a task";
+          $("#sideActions").style.display="none";
+          loading("Loaded "+filtered.length+" task(s)");
+        })
+        .catch(function(err){
+          console.error(err); loading(err.message || "Failed to load");
+          state.calendar.removeAllEvents();
+        });
+    }
+  });
+  state.calendar.render();
+
+  // Legends on toolbar right
+  const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
+  if (toolbar){
+    const legends = document.createElement("div");
+    legends.className = "fc-toolbar-chunk legends";
+    legends.innerHTML = `
+      <span><span class="legend-box legend-planned"></span> Planned</span>
+      <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
+      <span><span class="legend-box legend-completed"></span> Completed</span>
+      <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
+      <span><span class="legend-box legend-postponed"></span> Postponed</span>
+    `;
+    toolbar.appendChild(legends);
+  }
+}
+if (document.readyState==="complete" || document.readyState==="interactive") setTimeout(startCalendar,0);
+else document.addEventListener("DOMContentLoaded", startCalendar);
+</script>
 </body>
 </html>
