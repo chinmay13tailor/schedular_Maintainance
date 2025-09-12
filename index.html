@@ -7,8 +7,10 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
 <style>
-  :root{--ring:#e5e7eb;--bg:#fff;--text:#0f172a;--muted:#64748b;
-        --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#374151;--gray:#6b7280}
+  :root{
+    --ring:#e5e7eb;--bg:#fff;--text:#0f172a;--muted:#64748b;
+    --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#0f172a;--gray:#6b7280
+  }
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
   .app{display:grid;grid-template-columns:1fr 320px;gap:16px;min-height:100vh;padding:16px}
@@ -66,6 +68,31 @@
   .legend-completed{background:var(--green)}
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
+
+  /* ===== Report (screen + PDF identical) ===== */
+  .ms-report{max-width:980px;margin:0 auto;background:#fff}
+  .ms-banner{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .ms-banner .title{font-weight:900;text-align:center;flex:1}
+  .ms-submeta{font-size:12px;text-align:right}
+  .ms-section{display:block;width:100%;margin-top:10px}
+  .ms-section__title{background:var(--slate);color:#fff;padding:10px 12px;border-radius:10px;font-weight:900}
+  .ms-box{border:1px solid var(--ring);border-radius:10px;padding:10px;margin-top:8px}
+  .ms-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .ms-grid .ms-box{margin:0}
+  .ms-table{width:100%;border-collapse:collapse}
+  .ms-table th,.ms-table td{border:1px solid var(--ring);padding:8px;font-size:13px}
+  .report-actions{display:flex;justify-content:flex-end;margin-top:12px}
+
+  /* PRINT / PDF FIXES */
+  @media print{
+    html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .ms-report{width:190mm;margin:0 auto;background:#fff}
+    .ms-banner,.ms-section__title{background:#0f172a !important;color:#fff !important}
+    .ms-avoid-break{break-inside:avoid;page-break-inside:avoid}
+    .ms-section{display:block;width:100%}
+    .ms-checklist{break-before:avoid-page}
+    .btn-download,.report-actions{display:none !important}
+  }
 </style>
 </head>
 <body>
@@ -108,7 +135,7 @@
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
       <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
       <button class="btn primary" id="btnNew"    type="button">New</button>
-      <button class="btn"         id="btnPDF"    type="button">Generate Task (PDF)</button>
+      <button class="btn primary" id="btnReport" type="button">Generate Report</button>
     </div>
   </aside>
 </div>
@@ -167,8 +194,13 @@
       </div>
 
       <div class="row-full">
-        <label>Tasks (comma-separated)</label>
-        <textarea id="fTasks" class="input" rows="2" placeholder="e.g., Inspect guards, Check belt tension, Lubricate bearings"></textarea>
+        <label>Checklist tasks (MS_Task)</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="taskOne" class="input" type="text" placeholder="e.g., Check oil level">
+          <button class="btn ghost" id="addTaskBtn" type="button">+</button>
+        </div>
+        <div id="taskChips" class="chips"></div>
+        <div class="muted" style="font-size:12px">Stored as comma-separated in <code>MS_Task</code>.</div>
       </div>
 
       <div>
@@ -188,10 +220,88 @@
   </div>
 </div>
 
+<!-- Hidden Report container -->
+<div id="msReport" class="ms-report" style="display:none; padding:12px">
+  <div class="ms-banner ms-avoid-break">
+    <img src="PlantwizLogo.png" alt="PlantWiz" style="height:28px">
+    <div class="title">
+      <div style="font-size:18px">Pima Controls Pvt. Ltd</div>
+      <div style="font-size:12px;color:#64748b">Block No.298, Nr. Bacha Motors, Sanathal Cross Road, Ahmedabad (382210)</div>
+    </div>
+    <img src="PimaLogo.png" alt="Pima" style="height:28px">
+  </div>
+
+  <div class="ms-avoid-break" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <h2 style="margin:0">Maintenance Task Report</h2>
+    <div class="ms-submeta" id="msReportMeta"></div>
+  </div>
+
+  <section class="ms-section ms-avoid-break" id="msSummary">
+    <div class="ms-section__title">Task Summary</div>
+    <div class="ms-grid" style="margin-top:8px">
+      <div class="ms-box">
+        <table class="ms-table">
+          <tr><th style="width:130px">Title</th><td id="r_title"></td></tr>
+          <tr><th>Machine / Asset</th><td id="r_machine"></td></tr>
+          <tr><th>Type</th><td id="r_type"></td></tr>
+          <tr><th>Priority</th><td id="r_priority"></td></tr>
+          <tr><th>Status</th><td id="r_status"></td></tr>
+        </table>
+      </div>
+      <div class="ms-box">
+        <table class="ms-table">
+          <tr><th style="width:130px">Scheduled Date</th><td id="r_date"></td></tr>
+          <tr><th>Start</th><td id="r_start"></td></tr>
+          <tr><th>End</th><td id="r_end"></td></tr>
+          <tr><th>Duration</th><td id="r_duration"></td></tr>
+        </table>
+      </div>
+      <div class="ms-box">
+        <table class="ms-table">
+          <tr><th style="width:130px">Technicians</th><td id="r_techs"></td></tr>
+          <tr><th>Report ID TS</th><td id="r_ts"></td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="ms-section ms-avoid-break" id="msDescSection">
+    <div class="ms-section__title">Description / Notes</div>
+    <div class="ms-box" id="r_desc"></div>
+  </section>
+
+  <section class="ms-section ms-checklist ms-avoid-break" id="msChecklistSection">
+    <div class="ms-section__title">Checklist</div>
+    <div class="ms-box" style="padding:0">
+      <table class="ms-table" id="r_checklist">
+        <thead>
+          <tr><th style="width:40px">#</th><th>Task Item</th><th style="width:70px">Done</th><th>Remarks</th><th style="width:120px">Checked By</th><th style="width:90px">Time</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="ms-section ms-avoid-break">
+    <div class="ms-section__title">Approvals</div>
+    <div class="ms-grid" style="margin-top:8px">
+      <div class="ms-box"><div style="height:72px"></div><div style="font-weight:700">Technician Sign & Date</div></div>
+      <div class="ms-box"><div style="height:72px"></div><div style="font-weight:700">Supervisor Sign & Date</div></div>
+      <div></div>
+    </div>
+  </section>
+
+  <div class="report-actions">
+    <button class="btn primary btn-download" onclick="downloadMaintenancePdf()">Download PDF</button>
+  </div>
+
+  <div style="font-size:12px;color:#64748b;margin-top:8px">Generated by Maintenance Scheduler</div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 /************ CONFIG ************/
-// Change these 3 to your environment
 var ORIGIN    = "https://plantwiz.pimateck.in";
 var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
@@ -219,8 +329,9 @@ function hhmmToMs(baseDate, hhmm){
   var d = new Date(baseDate); d.setHours(h,m,0,0); return d.getTime();
 }
 function msToHHMM(ms){
-  var d = new Date(ms), h = d.getHours()%12 || 12, ampm = d.getHours()>=12?"PM":"AM";
-  return pad2(h)+":"+pad2(d.getMinutes())+" "+ampm;
+  var d = new Date(ms);
+  var h = d.getHours()%12 || 12, am = d.getHours()>=12 ? "PM":"AM";
+  return pad2(h)+":"+pad2(d.getMinutes())+" "+am;
 }
 function colorByStatus(s){
   var v = String(s||"Planned").toLowerCase();
@@ -240,8 +351,11 @@ function eventContent(arg){
 /************ STATE ************/
 var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
+  // for modal chips
   pickedDate: null,
   technicians: [],
+  tasks: [],
+  // filters
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: []
 };
@@ -413,35 +527,38 @@ function showDetails(ev){
       '<span>Priority</span><span>'+escapeHtml(String(p.MS_Priority??""))+'</span>'+
       '<span>Status</span><span>'+escapeHtml(p.MS_Status||"Planned")+'</span>'+
       '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
-      '<span>Tasks</span><span>'+escapeHtml(p.MS_Task||"-")+'</span>'+
       '<span>Start</span><span>'+fmt(p.MS_Start)+'</span>'+
       '<span>End</span><span>'+fmt(p.MS_End)+'</span>'+
+      '<span>Tasks</span><span>'+escapeHtml(p.MS_Task||"-")+'</span>'+
       '<span>Description</span><span>'+escapeHtml(p.MS_Description||"-")+'</span>'+
     '</div>';
   $("#sideActions").style.display = "flex";
 }
 
-/************ MODAL + TECH CHIPS ************/
+/************ MODAL + CHIPS ************/
 var overlay = $("#overlay");
 function busy(on){
-  ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
+  ["saveTask","btnCancel","btnEdit","btnNew","btnReport"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
 }
-function refreshTechChips(){
-  var box=$("#techChips"); box.innerHTML="";
-  state.technicians.forEach(function(name, idx){
+function refreshChips(container, arr){
+  var box=$(container); box.innerHTML="";
+  arr.forEach(function(name, idx){
     var chip=document.createElement("span"); chip.className="chip";
     chip.innerHTML='<span>'+escapeHtml(name)+'</span><button type="button" aria-label="Remove">✕</button>';
-    chip.querySelector("button").addEventListener("click", function(){ state.technicians.splice(idx,1); refreshTechChips(); });
+    chip.querySelector("button").addEventListener("click", function(){ arr.splice(idx,1); refreshChips(container, arr); });
     box.appendChild(chip);
   });
 }
-function addOneTech(){
-  var v=($("#techOne").value||"").trim(); if(!v) return;
-  if(state.technicians.includes(v)){ alert("Already added: "+v); return; }
-  state.technicians.push(v); $("#techOne").value=""; refreshTechChips();
+function addOne(fromInputId, arr, container){
+  var v=($(fromInputId).value||"").trim(); if(!v) return;
+  if(arr.includes(v)){ alert("Already added: "+v); return; }
+  arr.push(v); $(fromInputId).value=""; refreshChips(container, arr);
 }
-$("#addTechBtn").addEventListener("click", addOneTech);
-$("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
+$("#addTechBtn").addEventListener("click", function(){ addOne("#techOne", state.technicians, "#techChips"); });
+$("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOne("#techOne", state.technicians, "#techChips"); } });
+
+$("#addTaskBtn").addEventListener("click", function(){ addOne("#taskOne", state.tasks, "#taskChips"); });
+$("#taskOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOne("#taskOne", state.tasks, "#taskChips"); } });
 
 $("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
@@ -463,10 +580,12 @@ $("#btnEdit").addEventListener("click", function(){
   $("#fTimeStart").value= pad2(new Date(p.MS_Start).getHours())+":"+pad2(new Date(p.MS_Start).getMinutes());
   $("#fTimeEnd").value  = pad2(new Date(p.MS_End).getHours())+":"+pad2(new Date(p.MS_End).getMinutes());
   state.technicians     = (p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
-  refreshTechChips(); $("#techOne").value="";
+  state.tasks           = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  refreshChips("#techChips", state.technicians);
+  refreshChips("#taskChips", state.tasks);
+  $("#techOne").value=""; $("#taskOne").value="";
   $("#fStatus").value   = p.MS_Status || "Planned";
   $("#fDesc").value     = p.MS_Description || "";
-  $("#fTasks").value    = p.MS_Task || "";
 
   overlay.style.display="flex";
 });
@@ -512,9 +631,11 @@ function openModalForDate(jsDate){
   $("#fPriority").value="3";
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
-  state.technicians=[]; refreshTechChips(); $("#techOne").value="";
+  state.technicians=[]; state.tasks=[];
+  refreshChips("#techChips", state.technicians);
+  refreshChips("#taskChips", state.tasks);
+  $("#techOne").value=""; $("#taskOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
-  $("#fTasks").value="";
   overlay.style.display="flex";
 }
 function collectPayload(){
@@ -532,7 +653,7 @@ function collectPayload(){
     MS_Status: $("#fStatus").value || "Planned",
     MS_Description: ($("#fDesc").value||"").trim(),
     MS_Technicians: state.technicians.join(", "),
-    MS_Task: ($("#fTasks").value||"").trim()
+    MS_Task: state.tasks.join(", ")
   };
 }
 function validatePayload(p){
@@ -569,15 +690,17 @@ function onUpdate(){
       overlay.style.display="none";
       startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
         var p = found.extendedProps || {};
-        var ok = String(p.MS_Title)==String(payload.MS_Title)
-          && String(p.MS_Machine)==String(payload.MS_Machine)
-          && String(p.MS_Type)==String(payload.MS_Type)
-          && String(p.MS_Priority)==String(payload.MS_Priority)
-          && String(p.MS_Status)==String(payload.MS_Status)
-          && Number(p.MS_Start)==Number(payload.MS_Start)
-          && Number(p.MS_End)==Number(payload.MS_End)
-          && String(p.MS_Technicians)==String(payload.MS_Technicians)
-          && String(p.MS_Task)==String(payload.MS_Task);
+        var ok =
+          String(p.MS_Title||"") === String(payload.MS_Title||"") &&
+          String(p.MS_Machine||"") === String(payload.MS_Machine||"") &&
+          String(p.MS_Type||"") === String(payload.MS_Type||"") &&
+          String(p.MS_Priority) === String(payload.MS_Priority) &&
+          String(p.MS_Status||"") === String(payload.MS_Status||"") &&
+          Number(p.MS_Start||0) === Number(payload.MS_Start||0) &&
+          Number(p.MS_End||0)   === Number(payload.MS_End||0) &&
+          String(p.MS_Technicians||"") === String(payload.MS_Technicians||"") &&
+          String(p.MS_Task||"") === String(payload.MS_Task||"") &&
+          String(p.MS_Description||"") === String(payload.MS_Description||"");
         return ok;
       });
     })
@@ -585,114 +708,77 @@ function onUpdate(){
     .finally(function(){ busy(false); });
 }
 
-/************ REPORT (Generate Task PDF) ************/
-function openReportForSelected(){
-  if(!state.selectedEvent){ alert("Select a task first."); return; }
-  const p = state.selectedEvent.extendedProps || {};
-  const ms = {
-    ReportNo: (p.MS_Date?new Date(p.MS_Date).toISOString().slice(0,10):"") + " / " + (p.__ts||""),
-    __ts: p.__ts,
-    MS_Title: p.MS_Title, MS_Machine: p.MS_Machine, MS_Type: p.MS_Type,
-    MS_Priority: p.MS_Priority, MS_Status: p.MS_Status,
-    MS_Date: p.MS_Date, MS_Start: p.MS_Start, MS_End: p.MS_End,
-    MS_Technicians: p.MS_Technicians, MS_Description: p.MS_Description,
-    MS_Task: p.MS_Task
-  };
-  const html = buildReportHTML(ms);
-  const blob = new Blob([html], {type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
+/************ REPORT RENDER + DOWNLOAD ************/
+function fmtDate(ms){
+  if(!ms) return "-";
+  var d = new Date(Number(ms));
+  return d.toISOString().slice(0,10);
 }
-$("#btnPDF").addEventListener("click", openReportForSelected);
+function fmtDuration(ms1, ms2){
+  var m = Math.max(0, (ms2-ms1)/60000|0);
+  var h = (m/60|0), mm = (m%60);
+  return h+"h "+mm+"m";
+}
+function renderReportFrom(ev){
+  var p = ev.extendedProps;
+  // header meta
+  var now = new Date();
+  var meta = `Report No.: ${p.__ts || "-"}<br>Generated: ${now.toLocaleString()}`;
+  $("#msReportMeta").innerHTML = meta;
 
-// returns full HTML string of the report page (uses PlantwizLogo.png & PimaLogo.png from same folder)
-function buildReportHTML(ms){
-  const safe = s => String(s??"").replace(/[&<>\"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Maintenance Task Report</title>
-  <style>
-    :root{--ink:#0f172a;--muted:#475569;--ring:#e5e7eb;--soft:#f8fafc;--banner:#111827}
-    *{box-sizing:border-box}
-    body{margin:0;background:#fff;color:var(--ink);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    .page{max-width:900px;margin:18px auto; padding:18px;border:1px solid var(--ring);border-radius:12px}
-    .header{display:grid;grid-template-columns:140px 1fr 140px;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:2px solid var(--ring)}
-    .header img{max-width:120px;max-height:48px;object-fit:contain}
-    .brand{text-align:center}
-    .brand h1{margin:0;font-size:18px;font-weight:900}
-    .brand .addr{color:var(--muted);font-size:12px;margin-top:2px}
-    .meta{font-weight:700;font-size:11px;text-align:right}
-    .banner{margin:14px 0 8px;background:linear-gradient(90deg,var(--banner),#1f2937 60%,#111827);color:#fff;border-radius:10px;padding:8px 12px;font-weight:900;letter-spacing:.2px}
-    .grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin-bottom:8px}
-    .card{border:1px solid var(--ring); border-radius:10px; background:#fff; padding:10px}
-    .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 8px;font-size:13px}
-    .kv span:first-child{color:var(--muted);font-weight:700}
-    table{width:100%;border-collapse:separate;border-spacing:0;margin:8px 0 14px}
-    th,td{border:1px solid var(--ring);padding:8px;vertical-align:top}
-    th{background:var(--soft);text-align:left;font-weight:800}
-    .small{font-size:12px;color:var(--muted)}
-    .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
-    .sign .box{height:64px;border:1px dashed var(--ring);border-radius:10px}
-    .sign label{display:block;margin-top:4px;font-weight:700}
-    @page{size:A4;margin:14mm}
-    @media print{.actions{display:none} body{background:#fff} .page{border:0;margin:0;padding:0} footer{position:fixed;bottom:0;left:0;right:0} footer .pageno:after{content:counter(page) " / " counter(pages)}}
-    footer{margin-top:10px;padding-top:8px;border-top:1px solid var(--ring);display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
-    .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-weight:800;font-size:11px}
-  </style></head>
-  <body><div class="page">
-    <div class="header">
-      <img src="PlantwizLogo.png" alt="PlantWiz">
-      <div class="brand"><h1>Pima Controls Pvt. Ltd</h1><div class="addr">Block No.298, Nr. Bacha Motors, Sanathal Cross Road, Ahmedabad (382210)</div></div>
-      <div style="text-align:right"><img src="PimaLogo.png" alt="Pima"></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 2px">
-      <div style="font-size:20px;font-weight:900">Maintenance Task Report</div>
-      <div class="meta">
-        <div>Report No.: <span>${safe(ms.ReportNo)||"—"}</span></div>
-        <div>Generated: <span>${new Date().toLocaleString()}</span></div>
-      </div>
-    </div>
-    <div class="banner">Task Summary</div>
-    <div class="grid">
-      <div class="card"><div class="kv">
-        <span>Title</span><span>${safe(ms.MS_Title)||"—"}</span>
-        <span>Machine / Asset</span><span>${safe(ms.MS_Machine)||"—"}</span>
-        <span>Type</span><span>${safe(ms.MS_Type)||"—"}</span>
-        <span>Priority</span><span><span class="badge">${safe(ms.MS_Priority??"—")}</span></span>
-        <span>Status</span><span>${safe(ms.MS_Status)||"—"}</span>
-      </div></div>
-      <div class="card"><div class="kv">
-        <span>Scheduled Date</span><span>${ms.MS_Date? new Date(ms.MS_Date).toLocaleDateString(): "—"}</span>
-        <span>Start</span><span>${ms.MS_Start? new Date(ms.MS_Start).toLocaleTimeString(): "—"}</span>
-        <span>End</span><span>${ms.MS_End? new Date(ms.MS_End).toLocaleTimeString(): "—"}</span>
-        <span>Duration</span><span>${
-          (ms.MS_Start&&ms.MS_End)?(function(){let mins=Math.max(0,Math.round((ms.MS_End-ms.MS_Start)/60000));return Math.floor(mins/60)+'h '+(mins%60)+'m'})():"—"}</span>
-      </div></div>
-      <div class="card"><div class="kv">
-        <span>Technicians</span><span>${safe(ms.MS_Technicians)||"—"}</span>
-        <span>Report ID TS</span><span class="small">${safe(ms.__ts||"—")}</span>
-      </div></div>
-    </div>
-    <div class="banner">Description / Notes</div>
-    <div class="card">${safe(ms.MS_Description)||"—"}</div>
-    <div class="banner">Checklist</div>
-    <table><thead><tr><th style="width:44px">#</th><th>Task Item</th><th style="width:70px">Done</th><th>Remarks</th><th style="width:140px">Checked By</th><th style="width:92px">Time</th></tr></thead>
-      <tbody>${
-        (String(ms.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean).map((t,i)=>`<tr><td>${i+1}</td><td>${safe(t)}</td><td>☐</td><td></td><td></td><td></td></tr>`).join(""))
-        || `<tr><td>1</td><td>No tasks provided</td><td>☐</td><td></td><td></td><td></td></tr>`
-      }</tbody>
-    </table>
-    <div class="banner">Approvals</div>
-    <div class="sign">
-      <div><div class="box"></div><label>Technician Sign &amp; Date</label></div>
-      <div><div class="box"></div><label>Supervisor Sign &amp; Date</label></div>
-    </div>
-    <footer><div>Generated by Maintenance Scheduler</div><div class="pageno">Page </div></footer>
-  </div>
-  <div class="actions" style="max-width:900px;margin:8px auto 24px;display:flex;gap:8px;justify-content:flex-end">
-    <button onclick="window.print()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-weight:800;cursor:pointer">Download PDF</button>
-  </div>
-  </body></html>`;
+  // summary
+  $("#r_title").textContent    = p.MS_Title || "-";
+  $("#r_machine").textContent  = p.MS_Machine || "-";
+  $("#r_type").textContent     = p.MS_Type || "-";
+  $("#r_priority").textContent = String(p.MS_Priority ?? "-");
+  $("#r_status").textContent   = p.MS_Status || "-";
+
+  $("#r_date").textContent   = fmtDate(p.MS_Date || p.MS_Start);
+  $("#r_start").textContent  = msToHHMM(p.MS_Start);
+  $("#r_end").textContent    = msToHHMM(p.MS_End);
+  $("#r_duration").textContent = fmtDuration(p.MS_Start, p.MS_End);
+
+  $("#r_techs").textContent = p.MS_Technicians || "-";
+  $("#r_ts").textContent    = p.__ts || "-";
+
+  $("#r_desc").textContent  = p.MS_Description || "";
+
+  // checklist rows
+  var tbody = $("#r_checklist tbody");
+  tbody.innerHTML = "";
+  var tasks = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  if (tasks.length === 0) tasks = ["—"];
+  tasks.forEach(function(t, i){
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${i+1}</td><td>${escapeHtml(t)}</td><td style="text-align:center">☐</td><td></td><td></td><td></td>`;
+    tbody.appendChild(tr);
+  });
 }
+function downloadMaintenancePdf(){
+  const el = document.getElementById('msReport');
+  const imgs = el.querySelectorAll('img');
+  const promises = Array.from(imgs).map(img => img.complete ? Promise.resolve() : new Promise(res => { img.onload=res; img.onerror=res; }));
+  Promise.all(promises).then(() => {
+    const opt = {
+      margin:[10,10,12,10],
+      filename:`Maintenance_Task_Report_${new Date().toISOString().slice(0,10)}.pdf`,
+      image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:2,useCORS:true,letterRendering:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['css','legacy']}
+    };
+    setTimeout(()=>html2pdf().set(opt).from(el).save(),50);
+  });
+}
+$("#btnReport").addEventListener("click", function(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  renderReportFrom(state.selectedEvent);
+  // Show report for preview (optional). Keep hidden if you prefer direct download:
+  document.getElementById('msReport').style.display = 'block';
+  // Scroll to report area for preview
+  document.getElementById('msReport').scrollIntoView({behavior:'smooth',block:'start'});
+});
 
 /************ BOOT ************/
 function startCalendar(){
