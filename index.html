@@ -11,7 +11,8 @@
         --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#111827;--gray:#6b7280}
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  .app{display:grid;grid-template-columns:1fr 320px;gap:16px;min-height:100vh;padding:16px}
+  /* layout: sidebar | main | side */
+  .app{display:grid;grid-template-columns:220px 1fr 320px;gap:16px;min-height:100vh;padding:16px}
   header{grid-column:1/-1;display:flex;gap:10px;align-items:center;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
   .spacer{flex:1}
   .btn,.input,textarea,select{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:8px 10px}
@@ -21,7 +22,7 @@
   .btn.ghost{border-color:var(--ring);color:#0f172a}
   .btn:disabled{opacity:.6;cursor:not-allowed}
   .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
-  #calendar{min-height:560px}
+  #calendar{min-height:560px;padding:12px}
   .side{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;position:sticky;top:16px;height:fit-content}
   .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
   .h6{margin:0 0 10px;font-weight:900}
@@ -29,7 +30,8 @@
   .kpi span:first-child{color:#64748b}
   .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 
-  .filters{grid-column:1/-1;display:flex;align-items:center;gap:10px;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
+  /* move filters to main column (col 2) */
+  .filters{grid-column:2/3;display:flex;align-items:center;gap:10px;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
   .filters label{font-size:12px;color:#64748b;margin-right:4px}
 
   .fc .fc-toolbar{padding:10px}
@@ -67,6 +69,21 @@
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
+  /* sidebar style */
+  .sidebar { grid-column:1/2; border:1px solid var(--ring); border-radius:12px; padding:12px; background:#fff; height:fit-content; position:sticky; top:16px; }
+  .sidebar h4{margin:0 0 10px;font-size:14px}
+  .menu-btn{display:block;width:100%;text-align:left;padding:10px;border-radius:8px;border:1px solid var(--ring);background:#fff;margin-bottom:8px;cursor:pointer}
+  .menu-btn.active{background:linear-gradient(#eef2ff,#e0f2fe);font-weight:800}
+
+  /* views in main area */
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* list/missed table styles */
+  .list-card{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:12px}
+  .list-table{width:100%;border-collapse:collapse}
+  .list-table th,.list-table td{border:1px solid var(--ring);padding:8px;text-align:left;font-size:13px}
+
   /* ===== PDF styles (used inside hidden report container) ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
   .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
@@ -96,7 +113,16 @@
     <span id="loading"></span>
   </header>
 
-  <!-- Filters -->
+  <!-- Sidebar (new) -->
+  <nav class="sidebar" id="mainSidebar">
+    <h4>Views</h4>
+    <button class="menu-btn active" data-view="calendarView" id="menuCalendar">📅 Calendar</button>
+    <button class="menu-btn" data-view="listView" id="menuList">📋 List View</button>
+    <button class="menu-btn" data-view="missedView" id="menuMissed">⚠️ Missed Maintenance</button>
+    <button class="menu-btn" data-view="tipsView" id="menuTips">💡 Tips</button>
+  </nav>
+
+  <!-- Filters (main column) -->
   <div class="filters">
     <label>Machine</label>
     <select id="filtMa" class="input" style="min-width:140px"><option value="__ALL__">All</option></select>
@@ -120,8 +146,58 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <div class="card"><div id="calendar"></div></div>
+  <!-- Main content column (views) -->
+  <div>
+    <!-- Calendar view (original calendar container) -->
+    <div id="calendarView" class="view active">
+      <div class="card"><div id="calendar"></div></div>
+    </div>
 
+    <!-- List view -->
+    <div id="listView" class="view">
+      <div class="list-card">
+        <h3 style="margin-top:0">All Scheduled Tasks</h3>
+        <table class="list-table" id="listTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Title</th><th>Machine</th><th>Type</th><th>Start</th><th>End</th><th>Status</th><th>Technicians</th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Missed view -->
+    <div id="missedView" class="view">
+      <div class="list-card">
+        <h3 style="margin-top:0">Missed Maintenance</h3>
+        <table class="list-table" id="missedTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Title</th><th>Machine</th><th>Scheduled</th><th>Status</th><th>Technicians</th>
+            </tr>
+          </thead>
+          <tbody id="missedBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tips view -->
+    <div id="tipsView" class="view">
+      <div class="list-card">
+        <h3 style="margin-top:0">Maintenance Tips</h3>
+        <ul id="tipsList">
+          <li>Lubricate moving parts every 7 days</li>
+          <li>Check filters after 1000 hours</li>
+          <li>Inspect belts for wear monthly</li>
+          <li>Clean electrical panels quarterly</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right side panel (original aside) -->
   <aside class="side">
     <h3 class="h6">Maintenance task</h3>
     <div id="details" class="empty">Select a task on the calendar</div>
@@ -134,7 +210,7 @@
   </aside>
 </div>
 
-<!-- Create/Update Modal -->
+<!-- Create/Update Modal (unchanged) -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <header>
@@ -215,25 +291,24 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script>
-/************ CONFIG ************/
+/************ CONFIG (unchanged) ************/
 var ORIGIN    = "https://plantwiz.pimateck.in";
 var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
 var JWT       = new URLSearchParams(location.search).get("token")  || "";
 
-// Flags
+/************ FLAGS & KEYS (unchanged) ************/
 var ATTR_MS_SAVE    = "MS_Save_Button";
 var ATTR_MS_UPDATE  = "MS_Update_Buttton";
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Telemetry keys
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
-/************ HELPERS ************/
+/************ HELPERS (unchanged) ************/
 function $(s){ return document.querySelector(s); }
 function loading(t){ $("#loading").textContent = t || ""; }
 function escapeHtml(s){ return String(s||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -261,7 +336,7 @@ function eventContent(arg){
   return { html: '<span>'+escapeHtml(time)+' — '+escapeHtml(title)+'</span>' };
 }
 
-/************ STATE ************/
+/************ STATE (unchanged) ************/
 var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
@@ -270,7 +345,7 @@ var state = {
   lastEventsFull: []
 };
 
-/************ READ ************/
+/************ READ (unchanged) ************/
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -322,7 +397,7 @@ function readRange(rangeStart, rangeEnd){
     });
 }
 
-/************ FILTERS ************/
+/************ FILTERS (unchanged) ************/
 function populateFilters(events){
   var mas = new Set(), techs = new Set();
   events.forEach(ev=>{
@@ -354,17 +429,19 @@ function applyFilters(events){
 }
 $("#btnApplyFilters").addEventListener("click", function(){
   var filtered = applyFilters(state.lastEventsFull);
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+  if (state.calendar){ state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered); }
+  updateListAndMissed(); // refresh other views
   loading("Loaded "+filtered.length+" task(s)");
 });
 $("#btnResetFilters").addEventListener("click", function(){
   $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull);
+  if (state.calendar){ state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull); }
+  updateListAndMissed();
   loading("Loaded "+state.lastEventsFull.length+" task(s)");
 });
 
-/************ AUTO-REFRESH (5s, 3 min max) ************/
+/************ AUTO-REFRESH (unchanged) ************/
 var _autoTimer=null, _autoDeadline=0;
 function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
 function startAutoRefresh(expectedTs, predicate){
@@ -380,6 +457,7 @@ function startAutoRefresh(expectedTs, predicate){
         var filtered = applyFilters(events);
         state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
         $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
+        updateListAndMissed();
         loading("Loaded "+filtered.length+" task(s) — auto-refreshing…");
         if (expectedTs!=null){
           var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
@@ -393,7 +471,7 @@ function startAutoRefresh(expectedTs, predicate){
   }, 5000);
 }
 
-/************ WRITE ************/
+/************ WRITE (unchanged) ************/
 function writeAttributes(payload, opts){
   if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
@@ -423,7 +501,7 @@ function writeAttributes(payload, opts){
   }).then(res=>res.ok?null:res.text().then(t=>{throw new Error("Attribute write failed: "+t);})); 
 }
 
-/************ DETAILS ************/
+/************ DETAILS (unchanged) ************/
 function showDetails(ev){
   state.selectedEvent = ev;
   var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
@@ -445,7 +523,7 @@ function showDetails(ev){
   $("#sideActions").style.display = "flex";
 }
 
-/************ MODAL + TECH CHIPS ************/
+/************ MODAL + TECH CHIPS (unchanged) ************/
 var overlay = $("#overlay");
 function busy(on){
   ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
@@ -526,7 +604,7 @@ $("#btnCancel").addEventListener("click", function(){
     .finally(()=>{ busy(false); });
 });
 
-/************ CREATE / UPDATE ************/
+/************ CREATE / UPDATE (unchanged) ************/
 function openModalForDate(jsDate){
   state.mode="create";
   state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
@@ -609,7 +687,7 @@ function onUpdate(){
     .finally(function(){ busy(false); });
 }
 
-/************ PDF (Download) ************/
+/************ PDF (Download) (unchanged) ************/
 $("#btnPDF").addEventListener("click", function(){
   if (!state.selectedEvent){ alert("Select a task first."); return; }
   generatePdf(state.selectedEvent);
@@ -744,7 +822,52 @@ function generatePdf(ev){
   html2pdf().from(root).set(opt).save();
 }
 
-/************ BOOT ************/
+/************ BOOT (calendar init) with view-sync updates ************/
+function updateListAndMissed(){
+  // Use currently loaded events (state.lastEventsFull) and apply filters
+  var items = applyFilters(state.lastEventsFull || []);
+  // Populate list view
+  var listBody = $("#listBody"); listBody.innerHTML = "";
+  items.forEach(function(ev, idx){
+    var p = ev.extendedProps || {};
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td>"+(idx+1)+"</td>"
+      + "<td>"+escapeHtml(p.MS_Title||ev.title||"-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Machine||"-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Type||"-")+"</td>"
+      + "<td>"+(ev.start? new Date(ev.start).toLocaleString() : "-")+"</td>"
+      + "<td>"+(ev.end? new Date(ev.end).toLocaleString() : "-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Status||"-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Technicians||"-")+"</td>";
+    listBody.appendChild(tr);
+  });
+
+  // Populate missed view (scheduled date < today and not Completed)
+  var missedBody = $("#missedBody"); missedBody.innerHTML = "";
+  var today = new Date(); today.setHours(0,0,0,0);
+  var missed = items.filter(function(ev){
+    var p = ev.extendedProps || {};
+    var sch = p.MS_Date ? new Date(Number(p.MS_Date)) : (ev.start? new Date(ev.start) : null);
+    if (!sch) return false;
+    // missed if scheduled date (midnight) < today and status not completed
+    var schDay = new Date(sch.getFullYear(), sch.getMonth(), sch.getDate());
+    var isMissed = (schDay < today) && String((p.MS_Status||"")).toLowerCase() !== "completed";
+    return isMissed;
+  });
+  missed.forEach(function(ev, idx){
+    var p = ev.extendedProps || {};
+    var tr = document.createElement("tr");
+    var sch = p.MS_Date ? new Date(Number(p.MS_Date)) : (ev.start? new Date(ev.start) : null);
+    tr.innerHTML = "<td>"+(idx+1)+"</td>"
+      + "<td>"+escapeHtml(p.MS_Title||ev.title||"-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Machine||"-")+"</td>"
+      + "<td>"+(sch? sch.toLocaleDateString() : "-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Status||"-")+"</td>"
+      + "<td>"+escapeHtml(p.MS_Technicians||"-")+"</td>";
+    missedBody.appendChild(tr);
+  });
+}
+
 function startCalendar(){
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
@@ -773,6 +896,7 @@ function startCalendar(){
           state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
           $("#details").className="empty"; $("#details").textContent="Select a task";
           $("#sideActions").style.display="none";
+          updateListAndMissed(); // update list & missed when calendar loads
           loading("Loaded "+filtered.length+" task(s)");
         })
         .catch(function(err){
@@ -783,7 +907,7 @@ function startCalendar(){
   });
   state.calendar.render();
 
-  // Legends on toolbar right
+  // Legends on toolbar right (unchanged)
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
@@ -797,6 +921,21 @@ function startCalendar(){
     `;
     toolbar.appendChild(legends);
   }
+
+  // Sidebar menu button bindings
+  var menuButtons = document.querySelectorAll('.menu-btn');
+  menuButtons.forEach(btn => {
+    btn.addEventListener('click', function(){
+      menuButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      var view = btn.getAttribute('data-view');
+      // switch view
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      document.getElementById(view).classList.add('active');
+      // if switching to list or missed, refresh their contents
+      if (view==="listView" || view==="missedView") updateListAndMissed();
+    });
+  });
 }
 if (document.readyState==="complete" || document.readyState==="interactive") setTimeout(startCalendar,0);
 else document.addEventListener("DOMContentLoaded", startCalendar);
