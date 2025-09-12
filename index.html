@@ -6,119 +6,116 @@
 <title>Maintenance Scheduler</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+
 <style>
   :root{--ring:#e5e7eb;--bg:#fff;--text:#0f172a;--muted:#64748b;
         --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#111827;--gray:#6b7280}
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
 
-  /* ======= LAYOUT (Header | Filters | Rail + Main + Side) ======= */
+  /* ====== Layout (Header | Filters | Rail + Main + Side) ====== */
   .app{
     display:grid;
-    grid-template-columns:64px 1fr 320px;     /* rail | main | right side */
-    grid-template-rows:auto auto 1fr;         /* header | filters | content row */
+    grid-template-columns:64px 1fr 340px;
+    grid-template-rows:auto auto 1fr;
     gap:16px;
     min-height:100vh;
     padding:16px;
   }
 
-  header{
-    grid-column:1 / -1;
-    display:flex;gap:10px;align-items:center;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px
-  }
+  header{grid-column:1 / -1; display:flex; gap:10px; align-items:center;
+    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:10px 12px}
   .spacer{flex:1}
+  .muted{color:#64748b}
+  #loading{font-size:12px; color:#64748b; margin-left:8px}
 
-  /* Filters (span main + side) */
-  .filters{
-    grid-column:2 / -1;
-    display:flex;align-items:center;gap:10px;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px
-  }
+  /* Filters */
+  .filters{grid-column:2 / -1; display:flex; align-items:center; gap:10px;
+    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:10px 12px}
   .filters label{font-size:12px;color:#64748b;margin-right:4px}
 
-  /* Left navigation rail */
+  /* Left nav rail */
   .rail{
-    grid-column:1 / 2;
-    grid-row:3 / 4;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:8px;
-    display:flex;flex-direction:column;align-items:center;gap:8px;
-    position:sticky;top:16px;height:fit-content
+    grid-row:2 / -1; grid-column:1 / 2;
+    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:8px;
+    display:flex; flex-direction:column; align-items:center; gap:8px; position:sticky; top:16px; height:fit-content;
   }
-  .rail button{
-    width:48px;height:48px;border-radius:12px;border:1px solid var(--ring);
-    background:#fff;cursor:pointer;display:grid;place-items:center;font-size:18px
-  }
-  .rail button.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  .rail button{width:48px; height:48px; border-radius:12px; border:1px solid var(--ring);
+    background:#fff; cursor:pointer; display:grid; place-items:center; font-size:18px}
+  .rail button.active{border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15)}
   .rail button:hover{background:#f8fafc}
 
-  /* Main area (calendar/list container) */
-  .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
-  #mainCard{grid-column:2 / 3;grid-row:3 / 4;min-height:560px}
-  #calendar{min-height:560px}
-
-  /* Right side details */
-  .side{
-    grid-column:3 / 4;grid-row:3 / 4;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;
-    position:sticky;top:16px;height:fit-content
-  }
-
-  .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
-  .h6{margin:0 0 10px;font-weight:900}
-  .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
+  /* Main card (calendar/list live in here) + right details panel */
+  .card{border:1px solid var(--ring); border-radius:12px; background:#fff; overflow:hidden}
+  #mainCard{grid-column:2 / 3; grid-row:3 / 4; min-height:560px}
+  .side{grid-column:3 / 4; grid-row:3 / 4; border:1px solid var(--ring); border-radius:12px; background:#fff; padding:14px;
+    position:sticky; top:16px; height:fit-content}
+  .empty{padding:12px; text-align:center; color:#64748b; background:#f8fafc; border-radius:10px}
+  .h6{margin:0 0 10px; font-weight:900}
+  .kpi{display:grid; grid-template-columns:120px 1fr; gap:8px; font-size:13px}
   .kpi span:first-child{color:#64748b}
-  .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .side-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
 
-  .btn,.input,textarea,select{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:8px 10px}
-  .btn{cursor:pointer;font-weight:800}
-  .btn.primary{background:linear-gradient(#3b82f6,#2563eb);color:#fff;border:0}
-  .btn.danger{border-color:var(--red);color:#dc2626}
-  .btn.ghost{border-color:var(--ring);color:#0f172a}
-  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .btn,.input,textarea,select{border:1px solid var(--ring); border-radius:10px; background:#fff; padding:8px 10px}
+  .btn{cursor:pointer; font-weight:800}
+  .btn.primary{background:linear-gradient(#3b82f6,#2563eb); color:#fff; border:0}
+  .btn.danger{border-color:var(--red); color:#dc2626}
+  .btn.ghost{border-color:var(--ring); color:#0f172a}
+  .btn:disabled{opacity:.6; cursor:not-allowed}
 
-  .muted{color:#64748b}
-  #loading{font-size:12px;color:#64748b;margin-left:8px}
-
-  /* FullCalendar styles */
+  /* ====== FullCalendar look/feel (we re-use for List toolbar) ====== */
+  #calendar{min-height:560px}
   .fc .fc-toolbar{padding:10px}
-  .fc .fc-toolbar-title{font-size:16px;font-weight:800}
-  .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
+  .fc .fc-toolbar-title{font-size:16px; font-weight:800}
+  .fc .fc-button{background:#fff; border:1px solid var(--ring); color:#0f172a; border-radius:10px; padding:6px 10px}
   .fc-theme-standard td,.fc-theme-standard th{border-color:var(--ring)}
   .fc-daygrid-day-number{color:#64748b}
-
-  .event{border-radius:10px;border:0;padding:6px 8px;color:#fff;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
+  .event{border-radius:10px; border:0; padding:6px 8px; color:#fff; font-weight:700;
+    box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
   .status-planned{background:var(--blue)}
   .status-inprogress{background:var(--amber)}
   .status-completed{background:var(--green)}
   .status-cancelled{background:var(--red)}
   .status-postponed{background:var(--gray)}
 
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
-  .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;line-height:1}
-
-  .fc-toolbar-chunk.legends{display:flex;gap:14px;align-items:center;margin-left:8px}
-  .legend-box{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px}
+  /* Legends (re-used in both calendar and list) */
+  .legends{display:flex; gap:14px; align-items:center}
+  .legend-box{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px}
   .legend-planned{background:var(--blue)}
   .legend-inprogress{background:var(--amber)}
   .legend-completed{background:var(--green)}
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
-  /* ===== List tables ===== */
-  .toolbar-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--ring)}
-  .table-wrap{overflow:auto;max-height:68vh}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  thead th{position:sticky;top:0;background:#f8fafc;z-index:1}
-  th,td{border-bottom:1px solid var(--ring);padding:8px 10px;text-align:left;white-space:nowrap}
-  tr:hover{background:#f9fafb;cursor:pointer}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
+  /* ====== List view ====== */
+  #viewList{display:none}
+  .list-toolbar.fc{padding:10px} /* matches calendar toolbar padding */
+  .list-toolbar .fc-toolbar-chunk{display:flex; align-items:center; gap:8px}
+  .list-wrap{padding:10px}
+  .table-wrap{overflow:auto; max-height:60vh}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  thead th{position:sticky; top:0; background:#f8fafc; z-index:1}
+  th,td{border-bottom:1px solid var(--ring); padding:8px 10px; text-align:left; white-space:nowrap}
+  tr:hover{background:#f9fafb; cursor:pointer}
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; color:#fff; font-weight:700; font-size:11px}
   .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
   .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
 
-  /* ===== PDF styles ===== */
-  #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
+  /* ====== Modal (popup as before) ====== */
+  .overlay{position:fixed; inset:0; background:rgba(15,23,42,.35); display:none; align-items:center; justify-content:center; z-index:50}
+  .modal{width:min(680px,92vw); background:#fff; border:1px solid var(--ring); border-radius:14px; box-shadow:0 24px 48px rgba(0,0,0,.18)}
+  .modal header{display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ring); padding:12px 14px; border-radius:14px 14px 0 0}
+  .modal .body{padding:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .modal .row-full{grid-column:1 / -1}
+  .modal label{display:block; font-size:12px; color:#475569; font-weight:800; margin:0 0 6px}
+  .modal footer{display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--ring); padding:10px 14px; border-radius:0 0 14px 14px}
+
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--ring); border-radius:999px; font-size:12px; background:#f8fafc}
+  .chip button{border:0; background:transparent; cursor:pointer; font-weight:900; line-height:1}
+
+  /* ===== PDF hidden root ===== */
+  #pdfRoot{position:fixed; left:-99999px; top:-99999px; width:900px; background:#fff; color:#111827}
   .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
   .r-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:12px}
   .r-head .logos img{height:36px;object-fit:contain}
@@ -137,22 +134,6 @@
   .r-foot{display:flex;gap:12px;padding:12px}
   .sign{flex:1;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;min-height:72px}
   .r-fine{display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:8px 2px}
-
-  /* ===== Modal / Overlay ===== */
-  .overlay{
-    position:fixed;inset:0;background:rgba(15,23,42,.45);
-    display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;
-  }
-  .modal{
-    width:min(680px,92vw);max-height:90vh;overflow:auto;
-    background:#fff;border:1px solid var(--ring);border-radius:14px;
-    box-shadow:0 24px 48px rgba(0,0,0,.28)
-  }
-  .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
-  .modal .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .modal .row-full{grid-column:1 / -1}
-  .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
-  .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
 </style>
 </head>
 <body>
@@ -163,12 +144,12 @@
     <span id="loading"></span>
   </header>
 
-  <!-- Left Navigation Rail -->
-  <nav class="rail" aria-label="Quick views">
-    <button id="navCalendar" class="active" title="Calendar" type="button">📅</button>
-    <button id="navTips" title="Tips" type="button">💡</button>
-    <button id="navList" title="List View" type="button">📋</button>
-    <button id="navMissed" title="Missed Maintenance" type="button">⏰</button>
+  <!-- Left Nav Rail -->
+  <nav class="rail" aria-label="Views">
+    <button id="navCalendar" class="active" title="Calendar">📅</button>
+    <button id="navTips" title="Tips">💡</button>
+    <button id="navList" title="List View">📋</button>
+    <button id="navMissed" title="Missed Maintenance">⏰</button>
   </nav>
 
   <!-- Filters -->
@@ -195,54 +176,63 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main area: Calendar/List/Tips/Missed -->
+  <!-- Main Card (Calendar/List area) -->
   <div id="mainCard" class="card">
-    <!-- Calendar view -->
+    <!-- Calendar -->
     <div id="viewCalendar"><div id="calendar"></div></div>
 
-    <!-- List view -->
-    <div id="viewList" style="display:none;">
-      <div class="toolbar-row" id="listToolbar" style="gap:12px;">
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn" id="listPrev" type="button">‹</button>
-          <button class="btn" id="listToday" type="button">today</button>
-          <button class="btn" id="listNext" type="button">›</button>
-        </div>
-        <strong id="listTitle" style="font-size:15px;">—</strong>
-        <div class="fc-toolbar-chunk legends">
-          <span><span class="legend-box legend-planned"></span> Planned</span>
-          <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
-          <span><span class="legend-box legend-completed"></span> Completed</span>
-          <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
-          <span><span class="legend-box legend-postponed"></span> Postponed</span>
-          <span class="muted" id="listCount" style="margin-left:14px"></span>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table id="listTable">
-          <thead><tr>
-            <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Tips placeholder -->
-    <div id="viewTips" style="display:none;padding:18px;">
+    <div id="viewTips" style="display:none; padding:18px;">
       <div class="empty">Tips will appear here.</div>
     </div>
 
-    <!-- Missed placeholder -->
-    <div id="viewMissed" style="display:none;padding:18px;">
-      <div class="empty">Missed view coming soon.</div>
+    <!-- List View (toolbar styled exactly like FullCalendar) -->
+    <div id="viewList" style="display:none;">
+      <div class="list-toolbar fc fc-media-screen">
+        <div class="fc-toolbar fc-header-toolbar">
+          <div class="fc-toolbar-chunk">
+            <div class="fc-button-group">
+              <button id="listPrev" class="fc-button fc-button-primary" type="button" aria-label="prev">&lt;</button>
+              <button id="listToday" class="fc-button fc-button-primary" type="button">today</button>
+              <button id="listNext" class="fc-button fc-button-primary" type="button" aria-label="next">&gt;</button>
+            </div>
+          </div>
+          <div class="fc-toolbar-chunk"><h2 id="listTitle" class="fc-toolbar-title"></h2></div>
+          <div class="fc-toolbar-chunk" style="gap:16px">
+            <div class="legends">
+              <span><span class="legend-box legend-planned"></span> Planned</span>
+              <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
+              <span><span class="legend-box legend-completed"></span> Completed</span>
+              <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
+              <span><span class="legend-box legend-postponed"></span> Postponed</span>
+            </div>
+            <span class="muted" id="listCount"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="list-wrap">
+        <div class="table-wrap">
+          <table id="listTable">
+            <thead><tr>
+              <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Missed placeholder (kept; content can be added later) -->
+    <div id="viewMissed" style="display:none; padding:18px;">
+      <div class="empty">Missed Maintenance – coming soon.</div>
     </div>
   </div>
 
-  <!-- Right details -->
+  <!-- Right pane -->
   <aside class="side">
     <h3 class="h6">Maintenance task</h3>
-    <div id="details" class="empty">Select a task on the calendar</div>
+    <div id="details" class="empty">Select a task</div>
     <div class="side-actions" id="sideActions" style="display:none">
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
       <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
@@ -252,7 +242,7 @@
   </aside>
 </div>
 
-<!-- Create/Update Modal -->
+<!-- Create/Update Modal (popup) -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <header>
@@ -264,7 +254,6 @@
         <label>Title</label>
         <input id="fTitle" class="input" type="text" placeholder="e.g., Quarterly Service">
       </div>
-
       <div>
         <label>Machine</label>
         <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
@@ -275,18 +264,14 @@
           <option>Preventive</option><option>Corrective</option><option>Calibration</option><option>Inspection</option><option>Others</option>
         </select>
       </div>
-
       <div>
         <label>Priority (1=High)</label>
-        <select id="fPriority" class="input">
-          <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
-        </select>
+        <select id="fPriority" class="input"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
       </div>
       <div>
         <label>Date</label>
         <input id="fDate" class="input" type="date">
       </div>
-
       <div>
         <label>Start</label>
         <input id="fTimeStart" class="input" type="time" value="09:00">
@@ -295,7 +280,6 @@
         <label>End</label>
         <input id="fTimeEnd" class="input" type="time" value="11:00">
       </div>
-
       <div class="row-full">
         <label>Technician(s)</label>
         <div style="display:flex;gap:8px;align-items:center">
@@ -304,12 +288,10 @@
         </div>
         <div id="techChips" class="chips"></div>
       </div>
-
       <div class="row-full">
         <label>Checklist points (comma separated) <span class="muted">(stored in MS_Task)</span></label>
         <textarea id="fTasks" class="input" rows="2" placeholder="e.g., Check oil level, Replace air filter, Inspect belts"></textarea>
       </div>
-
       <div>
         <label>Status</label>
         <select id="fStatus" class="input">
@@ -332,6 +314,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+
 <script>
 /************ CONFIG ************/
 var ORIGIN    = "https://plantwiz.pimateck.in";
@@ -378,19 +361,19 @@ function eventContent(arg){
   var title = p.MS_Title || "Maintenance";
   return { html: '<span>'+escapeHtml(time)+' — '+escapeHtml(title)+'</span>' };
 }
-function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999); }
+function monthTitle(d){
+  return d.toLocaleString(undefined,{month:"long", year:"numeric"});
+}
 
 /************ STATE ************/
 var state = {
-  view: "calendar",
+  view:"calendar",
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
-  listMonth: null,          // Date pointing to the visible month in List View
-  lastListRange: null
+  listMonth: new Date()
 };
 
 /************ READ ************/
@@ -475,133 +458,13 @@ function applyFilters(events){
     return okMa && okTy && okSt && okTe;
   });
 }
-
-/************ LIST RENDER ************/
-function badge(status){
-  var c = String(status||"Planned").toLowerCase().replace("in-progress","inprogress");
-  return '<span class="badge '+c+'">'+escapeHtml(status||"Planned")+'</span>';
-}
-function renderList(events){
-  var tbody = $("#listTable tbody"); tbody.innerHTML = "";
-  events.forEach(ev=>{
-    var p = ev.extendedProps;
-    var tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td>'+escapeHtml(new Date(p.MS_Start).toLocaleDateString())+'</td>'+
-      '<td>'+escapeHtml(msToHHMM(p.MS_Start))+'</td>'+
-      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
-      '<td>'+badge(p.MS_Status)+'</td>'+
-      '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
-    tr.addEventListener("click", function(){
-      showDetails({ extendedProps: p });
-    });
-    tbody.appendChild(tr);
-  });
-  $("#listCount").textContent = "Showing "+events.length+" task(s)";
-}
-
-/************ LIST MONTH LOADER ************/
-function updateListTitle(d){
-  var fmt = d.toLocaleString(undefined,{month:"long", year:"numeric"});
-  $("#listTitle").textContent = fmt;
-}
-function loadListMonth(baseDate){
-  state.listMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
-  var s = startOfMonth(state.listMonth);
-  var e = endOfMonth(state.listMonth);
-  state.lastListRange = {start:s, end:e};
-  updateListTitle(state.listMonth);
-
-  loading("Loading…");
-  return readRange(s, e).then(function(events){
-    // keep filters/options in sync
-    populateFilters(events);
-    state.lastEventsFull = events.slice();
-    var filtered = applyFilters(events);
-    renderList(filtered);
-    loading("Loaded "+filtered.length+" task(s)");
-  }).catch(function(err){
-    console.error(err); loading(err.message||"Failed to load");
-  });
-}
-
-/************ VIEW SWITCH ************/
-function setActiveButton(id){
-  ["navCalendar","navTips","navList","navMissed"].forEach(k=>$("#"+k).classList.remove("active"));
-  $("#"+id).classList.add("active");
-}
-function showView(name){
-  state.view = name;
-  $("#viewCalendar").style.display = (name==="calendar")?"block":"none";
-  $("#viewList").style.display     = (name==="list")?"block":"none";
-  $("#viewTips").style.display     = (name==="tips")?"block":"none";
-  $("#viewMissed").style.display   = (name==="missed")?"block":"none";
-  setActiveButton(name==="calendar"?"navCalendar":name==="tips"?"navTips":name==="list"?"navList":"navMissed");
-
-  if (name==="list"){
-    // initialize list month from calendar current date (or today) the first time
-    if (!state.listMonth){
-      var seed = state.calendar ? state.calendar.getDate() : new Date();
-      loadListMonth(seed);
-    } else {
-      // refresh with current filters
-      var s = startOfMonth(state.listMonth), e=endOfMonth(state.listMonth);
-      readRange(s,e).then(function(events){
-        state.lastEventsFull = events.slice();
-        populateFilters(events);
-        renderList(applyFilters(events));
-      });
-    }
-  } else if (name==="calendar"){
-    refreshCalendar();
-  } else {
-    loading("");
-  }
-}
-$("#navCalendar").addEventListener("click", ()=>showView("calendar"));
-$("#navTips").addEventListener("click",     ()=>showView("tips"));
-$("#navList").addEventListener("click",     ()=>showView("list"));
-$("#navMissed").addEventListener("click",   ()=>showView("missed"));
-
-/* List month toolbar buttons */
-$("#listPrev").addEventListener("click", function(){
-  var d = state.listMonth ? new Date(state.listMonth) : new Date();
-  d.setMonth(d.getMonth()-1); loadListMonth(d);
-});
-$("#listNext").addEventListener("click", function(){
-  var d = state.listMonth ? new Date(state.listMonth) : new Date();
-  d.setMonth(d.getMonth()+1); loadListMonth(d);
-});
-$("#listToday").addEventListener("click", function(){
-  loadListMonth(new Date());
-});
-
-/************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
-function refreshCalendar(){
-  if (!state.calendar || !state.lastRange) return;
-  var filtered = applyFilters(state.lastEventsFull);
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
-  loading("Loaded "+filtered.length+" task(s)");
-}
 $("#btnApplyFilters").addEventListener("click", function(){
-  if (state.view==="list"){
-    // re-query current list month (keeps counts consistent)
-    if (state.listMonth) loadListMonth(state.listMonth);
-  } else {
-    refreshCalendar();
-  }
+  refreshView();
 });
 $("#btnResetFilters").addEventListener("click", function(){
   $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
-  if (state.view==="list"){
-    if (state.listMonth) loadListMonth(state.listMonth);
-  } else {
-    refreshCalendar();
-  }
+  refreshView();
 });
 
 /************ AUTO-REFRESH (5s, 3 min max) ************/
@@ -612,30 +475,12 @@ function startAutoRefresh(expectedTs, predicate){
   _autoDeadline = Date.now() + 3*60*1000;
   _autoTimer = setInterval(function(){
     if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped: timeout waiting for telemetry update"); return; }
-    if (state.view==="list" && state.lastListRange){
-      readRange(state.lastListRange.start, state.lastListRange.end)
-        .then(function(events){
-          state.lastEventsFull = events.slice();
-          populateFilters(events);
-          renderList(applyFilters(events));
-          if (expectedTs!=null){
-            var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
-            if (found){
-              if (typeof predicate==="function"){ try{ if(predicate(found)){ stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){} }
-              else { stopAutoRefresh(); loading("Update detected ✓"); }
-            }
-          }
-        })
-        .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
-      return;
-    }
     if (!state.lastRange) return;
     readRange(state.lastRange.start, state.lastRange.end)
       .then(function(events){
         state.lastEventsFull = events.slice();
         populateFilters(events);
-        refreshCalendar();
-        $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
+        refreshView(true);
         if (expectedTs!=null){
           var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
           if (found){
@@ -679,9 +524,8 @@ function writeAttributes(payload, opts){
 }
 
 /************ DETAILS ************/
-function showDetails(ev){
-  state.selectedEvent = ev;
-  var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
+function showDetailsFromProps(p){
+  function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
   $("#details").className = "";
   $("#details").innerHTML =
     '<div class="kpi">'+
@@ -699,6 +543,64 @@ function showDetails(ev){
     '</div>';
   $("#sideActions").style.display = "flex";
 }
+function showDetails(ev){
+  state.selectedEvent = ev;
+  showDetailsFromProps(ev.extendedProps);
+}
+
+/************ LIST RENDERERS ************/
+function badge(status){
+  var c = String(status||"Planned").toLowerCase().replace("in-progress","inprogress");
+  return '<span class="badge '+c+'">'+escapeHtml(status||"Planned")+'</span>';
+}
+function renderListForMonth(monthDate){
+  // set title like calendar
+  $("#listTitle").textContent = monthTitle(monthDate);
+
+  // month start/end
+  var start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  var end   = new Date(monthDate.getFullYear(), monthDate.getMonth()+1, 0, 23,59,59,999);
+  // filter to month window + filter dropdowns
+  var events = applyFilters(state.lastEventsFull).filter(ev => ev.start>=start && ev.start<=end);
+
+  var tbody = $("#listTable tbody"); tbody.innerHTML="";
+  events.forEach(ev=>{
+    var p = ev.extendedProps;
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td>'+escapeHtml(ev.start.toLocaleDateString())+'</td>'+
+      '<td>'+escapeHtml(msToHHMM(p.MS_Start))+'</td>'+
+      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
+      '<td>'+badge(p.MS_Status)+'</td>'+
+      '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
+    tr.addEventListener("click", function(){ showDetailsFromProps(p); });
+    tbody.appendChild(tr);
+  });
+
+  $("#listCount").textContent = "Showing " + events.length + " task(s)";
+}
+
+/************ VIEW SWITCH ************/
+function setActiveButton(id){
+  ["navCalendar","navTips","navList","navMissed"].forEach(k=>$("#"+k).classList.remove("active"));
+  $("#"+id).classList.add("active");
+}
+function showView(name){
+  state.view = name;
+  $("#viewCalendar").style.display = (name==="calendar")?"block":"none";
+  $("#viewTips").style.display     = (name==="tips")?"block":"none";
+  $("#viewList").style.display     = (name==="list")?"block":"none";
+  $("#viewMissed").style.display   = (name==="missed")?"block":"none";
+  setActiveButton(name==="calendar"?"navCalendar":name==="tips"?"navTips":name==="list"?"navList":"navMissed");
+  refreshView();
+}
+$("#navCalendar").addEventListener("click", ()=>showView("calendar"));
+$("#navTips").addEventListener("click",     ()=>showView("tips"));
+$("#navList").addEventListener("click",     ()=>showView("list"));
+$("#navMissed").addEventListener("click",   ()=>showView("missed"));
 
 /************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
@@ -722,11 +624,7 @@ function addOneTech(){
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
 
-function closeOverlay(){
-  overlay.style.display="none"; document.body.style.overflow="";
-}
-$("#closeModal").addEventListener("click", closeOverlay);
-
+$("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
 $("#saveTask").addEventListener("click", function(){ if (state.mode==="update") onUpdate(); else onCreate(); });
 
@@ -751,7 +649,7 @@ $("#btnEdit").addEventListener("click", function(){
   $("#fDesc").value     = p.MS_Description || "";
   $("#fTasks").value    = p.MS_Task || "";
 
-  overlay.style.display="flex"; document.body.style.overflow="hidden";
+  overlay.style.display="flex";
 });
 
 $("#btnCancel").addEventListener("click", function(){
@@ -798,7 +696,7 @@ function openModalForDate(jsDate){
   state.technicians=[]; refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
   $("#fTasks").value="";
-  overlay.style.display="flex"; document.body.style.overflow="hidden";
+  overlay.style.display="flex";
 }
 function collectPayload(){
   var dateStr = $("#fDate").value;
@@ -833,10 +731,7 @@ function onCreate(){
   var err = validatePayload(payload); if (err){ alert(err); return; }
   loading("Saving…"); busy(true);
   writeAttributes(payload, { mode:"create" })
-    .then(function(){
-      closeOverlay();
-      startAutoRefresh(payload.MS_Start, null);
-    })
+    .then(function(){ overlay.style.display="none"; startAutoRefresh(payload.MS_Start, null); })
     .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
     .finally(function(){ busy(false); });
 }
@@ -852,7 +747,7 @@ function onUpdate(){
   loading("Updating…"); busy(true);
   writeAttributes(payload, { mode:"update" })
     .then(function(){
-      closeOverlay();
+      overlay.style.display="none";
       startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
         var p = found.extendedProps || {};
         var titleOk = String(p.MS_Title||"") === String(payload.MS_Title||"");
@@ -876,7 +771,6 @@ $("#btnPDF").addEventListener("click", function(){
   if (!state.selectedEvent){ alert("Select a task first."); return; }
   generatePdf(state.selectedEvent);
 });
-
 function generatePdf(ev){
   var p = ev.extendedProps;
   var idTs = String(p.__ts || ev.start?.getTime() || Date.now());
@@ -939,9 +833,7 @@ function generatePdf(ev){
 
     <div class="r-section">
       <div class="r-sec-h">Description / Notes</div>
-      <div class="r-row">
-        <div class="box" style="grid-column:1/-1;">${escapeHtml(p.MS_Description||"-")}</div>
-      </div>
+      <div class="r-row"><div class="box" style="grid-column:1/-1;">${escapeHtml(p.MS_Description||"-")}</div></div>
     </div>
 
     <div class="r-section">
@@ -976,12 +868,8 @@ function generatePdf(ev){
     <div class="r-section">
       <div class="r-sec-h">Approvals</div>
       <div class="r-foot">
-        <div class="sign">
-          <strong>Technician Sign & Date</strong>
-        </div>
-        <div class="sign">
-          <strong>Supervisor Sign & Date</strong>
-        </div>
+        <div class="sign"><strong>Technician Sign & Date</strong></div>
+        <div class="sign"><strong>Supervisor Sign & Date</strong></div>
       </div>
     </div>
 
@@ -990,23 +878,32 @@ function generatePdf(ev){
       <span>Page 1 / 1</span>
     </div>
   `;
-
-  var pdfRoot = $("#pdfRoot");
-  pdfRoot.innerHTML = "";
-  pdfRoot.appendChild(root);
-
+  var pdfRoot = $("#pdfRoot"); pdfRoot.innerHTML = ""; pdfRoot.appendChild(root);
   const opt = {
-    margin:       [10,10,10,10],
-    filename:     (p.MS_Title ? p.MS_Title.replace(/\s+/g,'_') : 'Maintenance_Task') + "_" + reportNo + ".pdf",
-    image:        { type: 'jpeg', quality: 0.95 },
-    html2canvas:  { scale: 2, useCORS: true, background: '#ffffff' },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: ['css','legacy'] }
+    margin: [10,10,10,10],
+    filename: (p.MS_Title ? p.MS_Title.replace(/\s+/g,'_') : 'Maintenance_Task') + "_" + reportNo + ".pdf",
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, background: '#ffffff' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css','legacy'] }
   };
   html2pdf().from(root).set(opt).save();
 }
 
-/************ BOOT ************/
+/************ CALENDAR + VIEW BOOT ************/
+function refreshView(quiet){
+  const filtered = applyFilters(state.lastEventsFull);
+  if (state.view==="calendar"){
+    if (state.calendar){ state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered); }
+    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
+  } else if (state.view==="list"){
+    renderListForMonth(state.listMonth);
+    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
+  } else {
+    if (!quiet) loading("");
+  }
+}
+
 function startCalendar(){
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
@@ -1025,39 +922,38 @@ function startCalendar(){
     dateClick: function(info){ openModalForDate(info.date); },
     eventClick: function(info){ showDetails(info.event); },
     datesSet: function(info){
+      loading("Loading…");
       state.lastRange = { start: info.start, end: info.end };
       readRange(info.start, info.end)
         .then(function(events){
           state.lastEventsFull = events.slice();
           populateFilters(events);
-          if (state.view==="calendar"){
-            refreshCalendar();
-            $("#details").className="empty"; $("#details").textContent="Select a task";
-            $("#sideActions").style.display="none";
-          }
+          refreshView();
         })
         .catch(function(err){
           console.error(err); loading(err.message || "Failed to load");
-          if (state.calendar) state.calendar.removeAllEvents();
+          state.calendar.removeAllEvents();
         });
     }
   });
   state.calendar.render();
 
-  // Legends on toolbar right (calendar only)
-  const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
-  if (toolbar){
-    const legends = document.createElement("div");
-    legends.className = "fc-toolbar-chunk legends";
-    legends.innerHTML = `
-      <span><span class="legend-box legend-planned"></span> Planned</span>
-      <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
-      <span><span class="legend-box legend-completed"></span> Completed</span>
-      <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
-      <span><span class="legend-box legend-postponed"></span> Postponed</span>
-    `;
-    toolbar.appendChild(legends);
-  }
+  /* Hook up List View toolbar buttons */
+  $("#listPrev").addEventListener("click", function(){
+    state.listMonth = new Date(state.listMonth.getFullYear(), state.listMonth.getMonth()-1, 1);
+    renderListForMonth(state.listMonth);
+  });
+  $("#listNext").addEventListener("click", function(){
+    state.listMonth = new Date(state.listMonth.getFullYear(), state.listMonth.getMonth()+1, 1);
+    renderListForMonth(state.listMonth);
+  });
+  $("#listToday").addEventListener("click", function(){
+    state.listMonth = new Date();
+    renderListForMonth(state.listMonth);
+  });
+
+  // Initialize list title
+  $("#listTitle").textContent = monthTitle(state.listMonth);
 }
 if (document.readyState==="complete" || document.readyState==="interactive") setTimeout(startCalendar,0);
 else document.addEventListener("DOMContentLoaded", startCalendar);
