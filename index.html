@@ -12,75 +12,30 @@
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
 
-  /* ======= LAYOUT (Header | Filters | Rail + Main + Side) ======= */
-  .app{
-    display:grid;
-    grid-template-columns:64px 1fr 320px;     /* rail | main | right side */
-    grid-template-rows:auto auto 1fr;         /* header | filters | content row */
-    gap:16px;
-    min-height:100vh;
-    padding:16px;
-  }
+  /* UPDATED: layout me left rail add ki gai hai */
+  .app{display:grid;grid-template-columns:64px 1fr 320px;gap:16px;min-height:100vh;padding:16px}
 
-  header{
-    grid-column:1 / -1;                       /* header spans all columns */
-    display:flex;gap:10px;align-items:center;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px
-  }
+  header{grid-column:1/-1;display:flex;gap:10px;align-items:center;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
   .spacer{flex:1}
-
-  /* Filters bar should NOT overlap rail; it starts at column 2 */
-  .filters{
-    grid-column:2 / -1;                       /* starts after rail, spans main+side */
-    display:flex;align-items:center;gap:10px;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px
-  }
-  .filters label{font-size:12px;color:#64748b;margin-right:4px}
-
-  /* Left navigation rail */
-  .rail{
-    grid-column:1 / 2;
-    grid-row:3 / 4;                           /* sits under the filters row */
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:8px;
-    display:flex;flex-direction:column;align-items:center;gap:8px;
-    position:sticky;top:16px;height:fit-content
-  }
-  .rail button{
-    width:48px;height:48px;border-radius:12px;border:1px solid var(--ring);
-    background:#fff;cursor:pointer;display:grid;place-items:center;font-size:18px
-  }
-  .rail button.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
-  .rail button:hover{background:#f8fafc}
-
-  /* Main calendar card (center column) */
-  .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
-  #mainCard{grid-column:2 / 3;grid-row:3 / 4;min-height:560px}
-  #calendar{min-height:560px}
-
-  /* Right side (details) */
-  .side{
-    grid-column:3 / 4;grid-row:3 / 4;
-    border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;
-    position:sticky;top:16px;height:fit-content
-  }
-
-  .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
-  .h6{margin:0 0 10px;font-weight:900}
-  .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
-  .kpi span:first-child{color:#64748b}
-  .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-
   .btn,.input,textarea,select{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:8px 10px}
   .btn{cursor:pointer;font-weight:800}
   .btn.primary{background:linear-gradient(#3b82f6,#2563eb);color:#fff;border:0}
   .btn.danger{border-color:var(--red);color:#dc2626}
   .btn.ghost{border-color:var(--ring);color:#0f172a}
   .btn:disabled{opacity:.6;cursor:not-allowed}
+  .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
+  #calendar{min-height:560px}
+  .side{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;position:sticky;top:16px;height:fit-content}
+  .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
+  .h6{margin:0 0 10px;font-weight:900}
+  .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
+  .kpi span:first-child{color:#64748b}
+  .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 
-  .muted{color:#64748b}
-  #loading{font-size:12px;color:#64748b;margin-left:8px}
+  /* UPDATED: filters rail ke baad start hoti hain */
+  .filters{grid-column:2/-1;display:flex;align-items:center;gap:10px;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
+  .filters label{font-size:12px;color:#64748b;margin-right:4px}
 
-  /* FullCalendar styles */
   .fc .fc-toolbar{padding:10px}
   .fc .fc-toolbar-title{font-size:16px;font-weight:800}
   .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
@@ -93,6 +48,16 @@
   .status-completed{background:var(--green)}
   .status-cancelled{background:var(--red)}
   .status-postponed{background:var(--gray)}
+  .muted{color:#64748b}
+  #loading{font-size:12px;color:#64748b;margin-left:8px}
+
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{width:min(680px,92vw);background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.18)}
+  .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
+  .modal .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .modal .row-full{grid-column:1 / -1}
+  .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
+  .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
 
   .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
@@ -105,6 +70,34 @@
   .legend-completed{background:var(--green)}
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
+
+  /* === NEW: Left Rail (side menu) === */
+  .rail{
+    grid-row:2 / -1; grid-column:1 / 2;
+    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:8px;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    position:sticky; top:16px; height:fit-content;
+  }
+  .rail button{
+    width:48px; height:48px; border-radius:12px; border:1px solid var(--ring);
+    background:#fff; cursor:pointer; display:grid; place-items:center; font-size:18px;
+  }
+  .rail button.active{border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  .rail button:hover{background:#f8fafc}
+
+  /* === NEW: List/Missed tables === */
+  .toolbar-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--ring)}
+  .table-wrap{overflow:auto;max-height:68vh}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:#f8fafc;z-index:1}
+  th,td{border-bottom:1px solid var(--ring);padding:8px 10px;text-align:left;white-space:nowrap}
+  tr:hover{background:#f9fafb;cursor:pointer}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
+  .badge.planned{background:var(--blue)}
+  .badge.inprogress{background:var(--amber)}
+  .badge.completed{background:var(--green)}
+  .badge.cancelled{background:var(--red)}
+  .badge.postponed{background:var(--gray)}
 
   /* ===== PDF styles (used inside hidden report container) ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
@@ -130,21 +123,20 @@
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
   <header>
     <div class="spacer"></div>
     <span id="loading"></span>
   </header>
 
-  <!-- Left Navigation Rail (under filters, beside main area) -->
-  <nav class="rail" aria-label="Quick views">
-    <button id="navCalendar" class="active" title="Calendar" type="button">📅</button>
-    <button id="navTips" title="Tips" type="button">💡</button>
-    <button id="navList" title="List View" type="button">📋</button>
-    <button id="navMissed" title="Missed Maintenance" type="button">⏰</button>
+  <!-- NEW: Left Side Navigation -->
+  <nav class="rail">
+    <button id="navCalendar" class="active" title="Calendar">📅</button>
+    <button id="navTips" title="Tips">💡</button>
+    <button id="navList" title="List View">📋</button>
+    <button id="navMissed" title="Missed Maintenance">⏰</button>
   </nav>
 
-  <!-- Filters (spans main + right side) -->
+  <!-- Filters -->
   <div class="filters">
     <label>Machine</label>
     <select id="filtMa" class="input" style="min-width:140px"><option value="__ALL__">All</option></select>
@@ -168,10 +160,43 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main calendar card (center column) -->
-  <div id="mainCard" class="card"><div id="calendar"></div></div>
+  <!-- UPDATED: Main card becomes a container for all views -->
+  <div class="card" id="mainCard">
+    <!-- Calendar view (your original calendar kept as-is inside) -->
+    <div id="viewCalendar"><div id="calendar"></div></div>
 
-  <!-- Right details side -->
+    <!-- New: Tips placeholder -->
+    <div id="viewTips" style="display:none;padding:18px;">
+      <div class="empty">Tips will appear here.</div>
+    </div>
+
+    <!-- New: List view -->
+    <div id="viewList" style="display:none;">
+      <div class="toolbar-row"><strong>List View</strong><span class="muted" id="listCount"></span></div>
+      <div class="table-wrap">
+        <table id="listTable">
+          <thead><tr>
+            <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- New: Missed maintenance view -->
+    <div id="viewMissed" style="display:none;">
+      <div class="toolbar-row"><strong>Missed Maintenance</strong><span class="muted" id="missedCount"></span></div>
+      <div class="table-wrap">
+        <table id="missedTable">
+          <thead><tr>
+            <th>Due</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <aside class="side">
     <h3 class="h6">Maintenance task</h3>
     <div id="details" class="empty">Select a task on the calendar</div>
@@ -184,7 +209,7 @@
   </aside>
 </div>
 
-<!-- Create/Update Modal -->
+<!-- Create/Update Modal (unchanged) -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <header>
@@ -313,6 +338,7 @@ function eventContent(arg){
 
 /************ STATE ************/
 var state = {
+  view: "calendar",                           // NEW
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
@@ -403,15 +429,12 @@ function applyFilters(events){
   });
 }
 $("#btnApplyFilters").addEventListener("click", function(){
-  var filtered = applyFilters(state.lastEventsFull);
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
-  loading("Loaded "+filtered.length+" task(s)");
+  refreshView();  // re-render current view with filters
 });
 $("#btnResetFilters").addEventListener("click", function(){
   $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
-  state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull);
-  loading("Loaded "+state.lastEventsFull.length+" task(s)");
+  refreshView();
 });
 
 /************ AUTO-REFRESH (5s, 3 min max) ************/
@@ -427,10 +450,7 @@ function startAutoRefresh(expectedTs, predicate){
       .then(function(events){
         state.lastEventsFull = events.slice();
         populateFilters(events);
-        var filtered = applyFilters(events);
-        state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
-        $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
-        loading("Loaded "+filtered.length+" task(s) — auto-refreshing…");
+        refreshView(true);
         if (expectedTs!=null){
           var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
           if (found){
@@ -794,7 +814,95 @@ function generatePdf(ev){
   html2pdf().from(root).set(opt).save();
 }
 
-/************ BOOT ************/
+/************ NEW: List & Missed renderers + view switching ************/
+function badge(status){
+  var c = String(status||"Planned").toLowerCase().replace("in-progress","inprogress");
+  return '<span class="badge '+c+'">'+escapeHtml(status||"Planned")+'</span>';
+}
+function renderList(events){
+  var tbody = $("#listTable tbody"); if(!tbody) return; tbody.innerHTML="";
+  events.forEach(ev=>{
+    var p = ev.extendedProps;
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td>'+escapeHtml(new Date(p.MS_Start).toLocaleDateString())+'</td>'+
+      '<td>'+escapeHtml(new Date(p.MS_Start).toLocaleTimeString())+'</td>'+
+      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
+      '<td>'+badge(p.MS_Status)+'</td>'+
+      '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
+    tr.addEventListener("click", function(){ showDetails({extendedProps:p}); });
+    tbody.appendChild(tr);
+  });
+  var cEl = $("#listCount"); if (cEl) cEl.textContent = "Showing "+events.length+" task(s)";
+}
+function renderMissed(events){
+  var now = Date.now();
+  var missed = events.filter(ev=>{
+    var p = ev.extendedProps||{};
+    var s = String(p.MS_Status||"").toLowerCase();
+    var done = (s==="completed" || s==="cancelled");
+    return !done && Number(p.MS_End||0) < now;
+  });
+  var tbody = $("#missedTable tbody"); if(!tbody) return; tbody.innerHTML="";
+  missed.forEach(ev=>{
+    var p = ev.extendedProps;
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td>'+escapeHtml(new Date(p.MS_End).toLocaleString())+'</td>'+
+      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
+      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
+      '<td>'+badge(p.MS_Status)+'</td>';
+    tr.addEventListener("click", function(){ showDetails({extendedProps:p}); });
+    tbody.appendChild(tr);
+  });
+  var mEl = $("#missedCount"); if (mEl) mEl.textContent = "Found "+missed.length+" missed task(s)";
+}
+function setActiveButton(id){
+  ["navCalendar","navTips","navList","navMissed"].forEach(k=>{ var el=$("#"+k); if(el) el.classList.remove("active"); });
+  var act=$("#"+id); if(act) act.classList.add("active");
+}
+function showView(name){
+  state.view = name;
+  var vCal=$("#viewCalendar"), vTips=$("#viewTips"), vList=$("#viewList"), vMiss=$("#viewMissed");
+  if(vCal)  vCal.style.display  = (name==="calendar")?"block":"none";
+  if(vTips) vTips.style.display = (name==="tips")?"block":"none";
+  if(vList) vList.style.display = (name==="list")?"block":"none";
+  if(vMiss) vMiss.style.display = (name==="missed")?"block":"none";
+  setActiveButton(name==="calendar"?"navCalendar":name==="tips"?"navTips":name==="list"?"navList":"navMissed");
+  refreshView();
+}
+var _navCal=$("#navCalendar"), _navTips=$("#navTips"), _navList=$("#navList"), _navMiss=$("#navMissed");
+if(_navCal)  _navCal.addEventListener("click", ()=>showView("calendar"));
+if(_navTips) _navTips.addEventListener("click", ()=>showView("tips"));
+if(_navList) _navList.addEventListener("click", ()=>showView("list"));
+if(_navMiss) _navMiss.addEventListener("click", ()=>showView("missed"));
+
+function refreshView(quiet){
+  var events = state.lastEventsFull || [];
+  var filtered = applyFilters(events);
+  if (state.view==="calendar"){
+    if (state.calendar){
+      state.calendar.removeAllEvents();
+      state.calendar.addEventSource(filtered);
+    }
+    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
+  } else if (state.view==="list"){
+    renderList(filtered);
+    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
+  } else if (state.view==="missed"){
+    renderMissed(filtered);
+    if (!quiet) loading("Loaded "+filtered.length+" task(s) (filters applied)");
+  } else {
+    if (!quiet) loading("");
+  }
+}
+
+/************ BOOT (Calendar init) ************/
 function startCalendar(){
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
@@ -819,11 +927,16 @@ function startCalendar(){
         .then(function(events){
           state.lastEventsFull = events.slice();
           populateFilters(events);
+
+          /* Keep your original calendar behavior */
           var filtered = applyFilters(events);
           state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
           $("#details").className="empty"; $("#details").textContent="Select a task";
           $("#sideActions").style.display="none";
           loading("Loaded "+filtered.length+" task(s)");
+
+          /* Also update other views */
+          refreshView(true);
         })
         .catch(function(err){
           console.error(err); loading(err.message || "Failed to load");
