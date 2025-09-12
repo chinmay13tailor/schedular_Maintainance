@@ -8,79 +8,57 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
 <style>
   :root{--ring:#e5e7eb;--bg:#fff;--text:#0f172a;--muted:#64748b;
-        --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#0f172a;--gray:#6b7280}
+        --blue:#3b82f6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--slate:#111827;--gray:#6b7280}
   *{box-sizing:border-box}
   body{margin:0;background:#fff;color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-
-  /* --- Layout: nav rail | main | details --- */
-  .app{
-    display:grid;
-    grid-template-columns:64px 1fr 320px;
-    grid-template-rows:auto auto 1fr;
-    gap:16px;
-    min-height:100vh;
-    padding:16px;
-  }
-
-  header{grid-column:1 / -1; display:flex; gap:10px; align-items:center;
-    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:10px 12px}
+  .app{display:grid;grid-template-columns:1fr 320px;gap:16px;min-height:100vh;padding:16px}
+  header{grid-column:1/-1;display:flex;gap:10px;align-items:center;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
   .spacer{flex:1}
-  .filters{grid-column:2 / -1; display:flex; align-items:center; gap:10px;
-    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:10px 12px}
+  .btn,.input,textarea,select{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:8px 10px}
+  .btn{cursor:pointer;font-weight:800}
+  .btn.primary{background:linear-gradient(#3b82f6,#2563eb);color:#fff;border:0}
+  .btn.danger{border-color:var(--red);color:#dc2626}
+  .btn.ghost{border-color:var(--ring);color:#0f172a}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
+  #calendar{min-height:560px}
+  .side{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;position:sticky;top:16px;height:fit-content}
+  .empty{padding:12px;text-align:center;color:#64748b;background:#f8fafc;border-radius:10px}
+  .h6{margin:0 0 10px;font-weight:900}
+  .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
+  .kpi span:first-child{color:#64748b}
+  .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+  .filters{grid-column:1/-1;display:flex;align-items:center;gap:10px;border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px}
   .filters label{font-size:12px;color:#64748b;margin-right:4px}
 
-  /* Left nav rail */
-  .rail{
-    grid-row:2 / -1; grid-column:1 / 2;
-    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:8px;
-    display:flex; flex-direction:column; align-items:center; gap:8px;
-    position:sticky; top:16px; height:fit-content;
-  }
-  .rail button{
-    width:48px; height:48px; border-radius:12px; border:1px solid var(--ring);
-    background:#fff; cursor:pointer; display:grid; place-items:center; font-size:18px;
-  }
-  .rail button.active{border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15)}
-  .rail button:hover{background:#f8fafc}
-
-  /* Main area card + right details */
-  .card{border:1px solid var(--ring); border-radius:12px; background:#fff; overflow:hidden}
-  #mainCard{grid-column:2 / 3; grid-row:3 / 4; min-height:560px}
-  .side{grid-column:3 / 4; grid-row:3 / 4;
-    border:1px solid var(--ring); border-radius:12px; background:#fff; padding:14px;
-    position:sticky; top:16px; height:fit-content}
-  .empty{padding:12px; text-align:center; color:#64748b; background:#f8fafc; border-radius:10px}
-  .h6{margin:0 0 10px; font-weight:900}
-  .kpi{display:grid; grid-template-columns:120px 1fr; gap:8px; font-size:13px}
-  .kpi span:first-child{color:#64748b}
-  .side-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
-
-  .btn,.input,textarea,select{border:1px solid var(--ring); border-radius:10px; background:#fff; padding:8px 10px}
-  .btn{cursor:pointer; font-weight:800}
-  .btn.primary{background:linear-gradient(#3b82f6,#2563eb); color:#fff; border:0}
-  .btn.danger{border-color:var(--red); color:#dc2626}
-  .btn.ghost{border-color:var(--ring); color:#0f172a}
-  .btn:disabled{opacity:.6; cursor:not-allowed}
-
-  .muted{color:#64748b}
-  #loading{font-size:12px; color:#64748b; margin-left:8px}
-
-  /* Calendar specifics */
-  #calendar{min-height:560px}
   .fc .fc-toolbar{padding:10px}
-  .fc .fc-toolbar-title{font-size:16px; font-weight:800}
-  .fc .fc-button{background:#fff; border:1px solid var(--ring); color:#0f172a; border-radius:10px; padding:6px 10px}
+  .fc .fc-toolbar-title{font-size:16px;font-weight:800}
+  .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
   .fc-theme-standard td,.fc-theme-standard th{border-color:var(--ring)}
   .fc-daygrid-day-number{color:#64748b}
-  .event{border-radius:10px; border:0; padding:6px 8px; color:#fff; font-weight:700;
-    box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
+
+  .event{border-radius:10px;border:0;padding:6px 8px;color:#fff;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
   .status-planned{background:var(--blue)}
   .status-inprogress{background:var(--amber)}
   .status-completed{background:var(--green)}
   .status-cancelled{background:var(--red)}
   .status-postponed{background:var(--gray)}
+  .muted{color:#64748b}
+  #loading{font-size:12px;color:#64748b;margin-left:8px}
 
-  /* Toolbar legends */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{width:min(680px,92vw);background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.18)}
+  .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
+  .modal .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .modal .row-full{grid-column:1 / -1}
+  .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
+  .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
+  .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;line-height:1}
+
   .fc-toolbar-chunk.legends{display:flex;gap:14px;align-items:center;margin-left:8px}
   .legend-box{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px}
   .legend-planned{background:var(--blue)}
@@ -89,48 +67,36 @@
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
-  /* List / Missed views */
-  .toolbar-row{display:flex; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid var(--ring)}
-  .table-wrap{overflow:auto; max-height:68vh}
-  table{width:100%; border-collapse:collapse; font-size:13px}
-  thead th{position:sticky; top:0; background:#f8fafc; z-index:1}
-  th,td{border-bottom:1px solid var(--ring); padding:8px 10px; text-align:left; white-space:nowrap}
-  tr:hover{background:#f9fafb; cursor:pointer}
-  .badge{display:inline-block; padding:2px 8px; border-radius:999px; color:#fff; font-weight:700; font-size:11px}
-  .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
-  .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
-
-  /* Modal base */
-  .overlay{position:fixed; inset:0; background:rgba(15,23,42,.35); display:none; align-items:center; justify-content:center; z-index:50}
-  .modal{width:min(760px,92vw); background:#fff; border:1px solid var(--ring); border-radius:14px; box-shadow:0 24px 48px rgba(0,0,0,.18)}
-  .modal header{display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ring); padding:12px 14px; border-radius:14px 14px 0 0}
-  .modal .body{padding:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px}
-  .modal .row-full{grid-column:1 / -1}
-  .modal label{display:block; font-size:12px; color:#475569; font-weight:800; margin:0 0 6px}
-  .modal footer{display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--ring); padding:10px 14px; border-radius:0 0 14px 14px}
-
-  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
-  .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--ring); border-radius:999px; font-size:12px; background:#f8fafc}
-  .chip button{border:0; background:transparent; cursor:pointer; font-weight:900; line-height:1}
+  /* ===== PDF styles (used inside hidden report container) ===== */
+  #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
+  .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
+  .r-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:12px}
+  .r-head .logos img{height:36px;object-fit:contain}
+  .r-title{text-align:center}
+  .r-title h1{margin:2px 0 4px;font-size:18px}
+  .r-title .addr{font-size:11px;color:#6b7280}
+  .r-meta{font-size:11px;text-align:right;color:#374151}
+  .r-section{margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb}
+  .r-sec-h{background:#0f172a;color:#fff;padding:8px 10px;font-weight:800}
+  .r-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:10px}
+  .r-card{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+  .r-row{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:10px}
+  .r-row .box{border:1px solid #e5e7eb;border-radius:10px;padding:8px;min-height:48px}
+  .r-table{width:100%;border-collapse:collapse;font-size:12px}
+  .r-table th,.r-table td{border:1px solid #e5e7eb;padding:8px;vertical-align:top}
+  .r-foot{display:flex;gap:12px;padding:12px}
+  .sign{flex:1;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;min-height:72px}
+  .r-fine{display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:8px 2px}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
   <header>
     <div class="spacer"></div>
     <span id="loading"></span>
   </header>
 
-  <!-- Left Nav Rail -->
-  <nav class="rail">
-    <button id="navCalendar" class="active" title="Calendar">📅</button>
-    <button id="navTips" title="Tips">💡</button>
-    <button id="navList" title="List View">📋</button>
-    <button id="navMissed" title="Missed Maintenance">⏰</button>
-  </nav>
-
-  <!-- Filters (apply across all views) -->
+  <!-- Filters -->
   <div class="filters">
     <label>Machine</label>
     <select id="filtMa" class="input" style="min-width:140px"><option value="__ALL__">All</option></select>
@@ -154,47 +120,11 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main card (switchable content) -->
-  <div id="mainCard" class="card">
-    <!-- Calendar view -->
-    <div id="viewCalendar"><div id="calendar"></div></div>
+  <div class="card"><div id="calendar"></div></div>
 
-    <!-- Tips placeholder -->
-    <div id="viewTips" style="display:none; padding:18px;">
-      <div class="empty">Tips will appear here.</div>
-    </div>
-
-    <!-- List view -->
-    <div id="viewList" style="display:none;">
-      <div class="toolbar-row"><strong>List View</strong><span class="muted" id="listCount"></span></div>
-      <div class="table-wrap">
-        <table id="listTable">
-          <thead><tr>
-            <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Missed view -->
-    <div id="viewMissed" style="display:none;">
-      <div class="toolbar-row"><strong>Missed Maintenance</strong><span class="muted" id="missedCount"></span></div>
-      <div class="table-wrap">
-        <table id="missedTable">
-          <thead><tr>
-            <th>Due</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right pane -->
   <aside class="side">
     <h3 class="h6">Maintenance task</h3>
-    <div id="details" class="empty">Select a task on the calendar or list</div>
+    <div id="details" class="empty">Select a task on the calendar</div>
     <div class="side-actions" id="sideActions" style="display:none">
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
       <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
@@ -216,6 +146,7 @@
         <label>Title</label>
         <input id="fTitle" class="input" type="text" placeholder="e.g., Quarterly Service">
       </div>
+
       <div>
         <label>Machine</label>
         <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
@@ -226,14 +157,18 @@
           <option>Preventive</option><option>Corrective</option><option>Calibration</option><option>Inspection</option><option>Others</option>
         </select>
       </div>
+
       <div>
         <label>Priority (1=High)</label>
-        <select id="fPriority" class="input"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+        <select id="fPriority" class="input">
+          <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+        </select>
       </div>
       <div>
         <label>Date</label>
         <input id="fDate" class="input" type="date">
       </div>
+
       <div>
         <label>Start</label>
         <input id="fTimeStart" class="input" type="time" value="09:00">
@@ -252,18 +187,12 @@
         <div id="techChips" class="chips"></div>
       </div>
 
-      <!-- NEW: Task checklist (MS_Task) -->
       <div class="row-full">
-        <label>Checklist task(s)</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="taskOne" class="input" type="text" placeholder="Enter a task and click +">
-          <button class="btn ghost" id="addTaskBtn" type="button">+</button>
-        </div>
-        <div id="taskChips" class="chips"></div>
-        <div class="muted" style="font-size:12px">Saved in telemetry as MS_Task (comma-separated).</div>
+        <label>Checklist points (comma separated) <span class="muted">(stored in MS_Task)</span></label>
+        <textarea id="fTasks" class="input" rows="2" placeholder="e.g., Check oil level, Replace air filter, Inspect belts"></textarea>
       </div>
 
-      <div class="row-full">
+      <div>
         <label>Status</label>
         <select id="fStatus" class="input">
           <option>Planned</option><option>In-Progress</option><option>Completed</option><option>Cancelled</option><option>Postponed</option>
@@ -280,21 +209,24 @@
   </div>
 </div>
 
+<!-- Hidden PDF root -->
+<div id="pdfRoot" aria-hidden="true"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script>
 /************ CONFIG ************/
-// Change these 3 to your environment
 var ORIGIN    = "https://plantwiz.pimateck.in";
 var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
 var JWT       = new URLSearchParams(location.search).get("token")  || "";
 
-// Flags (used by rule-chain)
+// Flags
 var ATTR_MS_SAVE    = "MS_Save_Button";
-var ATTR_MS_UPDATE  = "MS_Update_Buttton";   // spelling per your RC
+var ATTR_MS_UPDATE  = "MS_Update_Buttton";
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Telemetry keys we read
+// Telemetry keys
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
@@ -328,21 +260,12 @@ function eventContent(arg){
   var title = p.MS_Title || "Maintenance";
   return { html: '<span>'+escapeHtml(time)+' — '+escapeHtml(title)+'</span>' };
 }
-function fmtDate(ms){ var d = new Date(ms); return d.toLocaleDateString(); }
-function fmtDateTime(ms){ return new Date(ms).toLocaleString(); }
-function durationHHMM(msStart, msEnd){
-  var d = Math.max(0, (msEnd - msStart));
-  var h = Math.floor(d/3600000), m = Math.floor((d%3600000)/60000);
-  return pad2(h)+":"+pad2(m);
-}
 
 /************ STATE ************/
 var state = {
-  view: "calendar",
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
-  tasks: [], // MS_Task (chips)
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: []
 };
@@ -429,11 +352,16 @@ function applyFilters(events){
     return okMa && okTy && okSt && okTe;
   });
 }
-$("#btnApplyFilters").addEventListener("click", function(){ refreshView(); });
+$("#btnApplyFilters").addEventListener("click", function(){
+  var filtered = applyFilters(state.lastEventsFull);
+  state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+  loading("Loaded "+filtered.length+" task(s)");
+});
 $("#btnResetFilters").addEventListener("click", function(){
   $("#filtMa").value="__ALL__"; $("#filtTy").value="__ALL__"; $("#filtSt").value="__ALL__"; $("#filtTech").value="__ALL__";
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
-  refreshView();
+  state.calendar.removeAllEvents(); state.calendar.addEventSource(state.lastEventsFull);
+  loading("Loaded "+state.lastEventsFull.length+" task(s)");
 });
 
 /************ AUTO-REFRESH (5s, 3 min max) ************/
@@ -449,7 +377,10 @@ function startAutoRefresh(expectedTs, predicate){
       .then(function(events){
         state.lastEventsFull = events.slice();
         populateFilters(events);
-        refreshView(true); // keep current view without overwriting the counter text
+        var filtered = applyFilters(events);
+        state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+        $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
+        loading("Loaded "+filtered.length+" task(s) — auto-refreshing…");
         if (expectedTs!=null){
           var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
           if (found){
@@ -480,7 +411,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false;
+    body[ATTR_MS_SAVE] = false; // trigger create path
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -492,10 +423,10 @@ function writeAttributes(payload, opts){
   }).then(res=>res.ok?null:res.text().then(t=>{throw new Error("Attribute write failed: "+t);})); 
 }
 
-/************ DETAILS PANE ************/
-function showDetailsFromProps(p){
-  function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
-  var tasks = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+/************ DETAILS ************/
+function showDetails(ev){
+  state.selectedEvent = ev;
+  var p = ev.extendedProps; function fmt(v){ return v?new Date(Number(v)).toLocaleString():"-"; }
   $("#details").className = "";
   $("#details").innerHTML =
     '<div class="kpi">'+
@@ -508,104 +439,13 @@ function showDetailsFromProps(p){
       '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
       '<span>Start</span><span>'+fmt(p.MS_Start)+'</span>'+
       '<span>End</span><span>'+fmt(p.MS_End)+'</span>'+
-      '<span>Checklist</span><span>'+ (tasks.length ? tasks.map(t=>"• "+escapeHtml(t)).join("<br>") : "-") +'</span>'+
+      '<span>Tasks</span><span>'+escapeHtml(p.MS_Task||"-")+'</span>'+
       '<span>Description</span><span>'+escapeHtml(p.MS_Description||"-")+'</span>'+
     '</div>';
   $("#sideActions").style.display = "flex";
 }
-function showDetails(ev){
-  state.selectedEvent = ev;
-  showDetailsFromProps(ev.extendedProps);
-}
 
-/************ LIST RENDERERS ************/
-function badge(status){
-  var c = String(status||"Planned").toLowerCase().replace("in-progress","inprogress");
-  return '<span class="badge '+c+'">'+escapeHtml(status||"Planned")+'</span>';
-}
-function renderList(events){
-  var tbody = $("#listTable tbody"); tbody.innerHTML="";
-  events.forEach(ev=>{
-    var p = ev.extendedProps;
-    var tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td>'+escapeHtml(new Date(p.MS_Start).toLocaleDateString())+'</td>'+
-      '<td>'+escapeHtml(msToHHMM(p.MS_Start))+'</td>'+
-      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
-      '<td>'+badge(p.MS_Status)+'</td>'+
-      '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
-    tr.addEventListener("click", function(){ showDetailsFromProps(p); });
-    tbody.appendChild(tr);
-  });
-  $("#listCount").textContent = "Showing "+events.length+" task(s)";
-}
-function renderMissed(events){
-  var now = Date.now();
-  var missed = events.filter(ev=>{
-    var p = ev.extendedProps||{};
-    var s = String(p.MS_Status||"").toLowerCase();
-    var done = (s==="completed" || s==="cancelled");
-    return !done && Number(p.MS_End||0) < now;
-  });
-  var tbody = $("#missedTable tbody"); tbody.innerHTML="";
-  missed.forEach(ev=>{
-    var p = ev.extendedProps;
-    var tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td>'+escapeHtml(new Date(p.MS_End).toLocaleString())+'</td>'+
-      '<td>'+escapeHtml(p.MS_Machine||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Title||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Type||"-")+'</td>'+
-      '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
-      '<td>'+badge(p.MS_Status)+'</td>';
-    tr.addEventListener("click", function(){ showDetailsFromProps(p); });
-    tbody.appendChild(tr);
-  });
-  $("#missedCount").textContent = "Found "+missed.length+" missed task(s)";
-}
-
-/************ VIEW SWITCH ************/
-function setActiveButton(id){
-  ["navCalendar","navTips","navList","navMissed"].forEach(k=>$("#"+k).classList.remove("active"));
-  $("#"+id).classList.add("active");
-}
-function showView(name){
-  state.view = name;
-  $("#viewCalendar").style.display = (name==="calendar")?"block":"none";
-  $("#viewTips").style.display = (name==="tips")?"block":"none";
-  $("#viewList").style.display = (name==="list")?"block":"none";
-  $("#viewMissed").style.display = (name==="missed")?"block":"none";
-  setActiveButton(name==="calendar"?"navCalendar":name==="tips"?"navTips":name==="list"?"navList":"navMissed");
-  refreshView();
-}
-$("#navCalendar").addEventListener("click", ()=>showView("calendar"));
-$("#navTips").addEventListener("click",     ()=>showView("tips"));
-$("#navList").addEventListener("click",     ()=>showView("list"));
-$("#navMissed").addEventListener("click",   ()=>showView("missed"));
-
-function refreshView(quiet){
-  var filtered = applyFilters(state.lastEventsFull);
-  if (state.view==="calendar"){
-    if (state.calendar){
-      state.calendar.removeAllEvents();
-      state.calendar.addEventSource(filtered);
-    }
-    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
-  } else if (state.view==="list"){
-    renderList(filtered);
-    if (!quiet) loading("Loaded "+filtered.length+" task(s)");
-  } else if (state.view==="missed"){
-    renderMissed(filtered);
-    if (!quiet) loading("Loaded "+filtered.length+" task(s) (filters applied)");
-  } else {
-    if (!quiet) loading("");
-  }
-}
-
-/************ MODAL + TECH/TASK CHIPS ************/
+/************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
 function busy(on){
   ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
@@ -619,34 +459,74 @@ function refreshTechChips(){
     box.appendChild(chip);
   });
 }
-function refreshTaskChips(){
-  var box=$("#taskChips"); box.innerHTML="";
-  state.tasks.forEach(function(txt, idx){
-    var chip=document.createElement("span"); chip.className="chip";
-    chip.innerHTML='<span>'+escapeHtml(txt)+'</span><button type="button" aria-label="Remove">✕</button>';
-    chip.querySelector("button").addEventListener("click", function(){ state.tasks.splice(idx,1); refreshTaskChips(); });
-    box.appendChild(chip);
-  });
-}
 function addOneTech(){
   var v=($("#techOne").value||"").trim(); if(!v) return;
   if(state.technicians.includes(v)){ alert("Already added: "+v); return; }
   state.technicians.push(v); $("#techOne").value=""; refreshTechChips();
 }
-function addOneTask(){
-  var v=($("#taskOne").value||"").trim(); if(!v) return;
-  if(state.tasks.includes(v)){ alert("Already added: "+v); return; }
-  state.tasks.push(v); $("#taskOne").value=""; refreshTaskChips();
-}
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
-$("#addTaskBtn").addEventListener("click", addOneTask);
-$("#taskOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTask(); } });
 
 $("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
 $("#saveTask").addEventListener("click", function(){ if (state.mode==="update") onUpdate(); else onCreate(); });
 
+$("#btnEdit").addEventListener("click", function(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  var p = state.selectedEvent.extendedProps;
+  state.mode="update"; $("#modalTitle").textContent="Update maintenance task"; $("#saveTask").textContent="Update";
+
+  var date = new Date(p.MS_Date || p.MS_Start);
+  state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  $("#fTitle").value    = p.MS_Title || "";
+  $("#fMachine").value  = p.MS_Machine || "";
+  $("#fType").value     = p.MS_Type || "Preventive";
+  $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
+  $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("#fTimeStart").value= pad2(new Date(p.MS_Start).getHours())+":"+pad2(new Date(p.MS_Start).getMinutes());
+  $("#fTimeEnd").value  = pad2(new Date(p.MS_End).getHours())+":"+pad2(new Date(p.MS_End).getMinutes());
+  state.technicians     = (p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
+  refreshTechChips(); $("#techOne").value="";
+  $("#fStatus").value   = p.MS_Status || "Planned";
+  $("#fDesc").value     = p.MS_Description || "";
+  $("#fTasks").value    = p.MS_Task || "";
+
+  overlay.style.display="flex";
+});
+
+$("#btnCancel").addEventListener("click", function(){
+  if(!state.selectedEvent){ alert("Select a task first."); return; }
+  if(!confirm("Cancel this maintenance task?")) return;
+
+  var p = state.selectedEvent.extendedProps;
+  var payload = {
+    MS_Title: p.MS_Title || "",
+    MS_Machine: p.MS_Machine || "",
+    MS_Type: p.MS_Type || "Preventive",
+    MS_Priority: p.MS_Priority != null ? p.MS_Priority : 3,
+    MS_Date: p.MS_Date || null,
+    MS_Start: p.MS_Start,
+    MS_End: p.MS_End,
+    MS_Status: "Cancelled",
+    MS_Description: p.MS_Description || "",
+    MS_Technicians: p.MS_Technicians || "",
+    MS_Task: p.MS_Task || ""
+  };
+  payload[ATTR_MS_UPD_TS] = p.__ts;
+
+  loading("Cancelling…"); busy(true);
+  writeAttributes(payload, { mode:"cancel" })
+    .then(function(){
+      startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
+        return String(found.extendedProps.MS_Status).toLowerCase()==="cancelled";
+      });
+    })
+    .catch(err=>{ console.error(err); alert(err.message||"Failed to cancel"); })
+    .finally(()=>{ busy(false); });
+});
+
+/************ CREATE / UPDATE ************/
 function openModalForDate(jsDate){
   state.mode="create";
   state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
@@ -657,12 +537,12 @@ function openModalForDate(jsDate){
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
   state.technicians=[]; refreshTechChips(); $("#techOne").value="";
-  state.tasks=[]; refreshTaskChips(); $("#taskOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
+  $("#fTasks").value="";
   overlay.style.display="flex";
 }
 function collectPayload(){
-  var dateStr = $("#fDate").value; // yyyy-mm-dd
+  var dateStr = $("#fDate").value;
   var parts = dateStr ? dateStr.split("-").map(Number) : null;
   var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
   return {
@@ -676,7 +556,7 @@ function collectPayload(){
     MS_Status: $("#fStatus").value || "Planned",
     MS_Description: ($("#fDesc").value||"").trim(),
     MS_Technicians: state.technicians.join(", "),
-    MS_Task: state.tasks.join(", ")
+    MS_Task: ($("#fTasks").value||"").trim()
   };
 }
 function validatePayload(p){
@@ -698,34 +578,15 @@ function onCreate(){
     .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
     .finally(function(){ busy(false); });
 }
-$("#btnEdit").addEventListener("click", function(){
-  if(!state.selectedEvent){ alert("Select a task first."); return; }
-  var p = state.selectedEvent.extendedProps;
-  state.mode="update"; $("#modalTitle").textContent="Update maintenance task"; $("#saveTask").textContent="Update";
-  var date = new Date(p.MS_Date || p.MS_Start);
-  state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  $("#fTitle").value    = p.MS_Title || "";
-  $("#fMachine").value  = p.MS_Machine || "";
-  $("#fType").value     = p.MS_Type || "Preventive";
-  $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
-  $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  $("#fTimeStart").value= pad2(new Date(p.MS_Start).getHours())+":"+pad2(new Date(p.MS_Start).getMinutes());
-  $("#fTimeEnd").value  = pad2(new Date(p.MS_End).getHours())+":"+pad2(new Date(p.MS_End).getMinutes());
-  state.technicians     = (p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
-  state.tasks           = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
-  refreshTechChips(); $("#techOne").value="";
-  refreshTaskChips(); $("#taskOne").value="";
-  $("#fStatus").value   = p.MS_Status || "Planned";
-  $("#fDesc").value     = p.MS_Description || "";
-  overlay.style.display="flex";
-});
 function onUpdate(){
   if(!state.selectedEvent || !state.selectedEvent.extendedProps){ alert("No task selected for update."); return; }
   var payload = collectPayload();
   var baseTs = state.selectedEvent.extendedProps.__ts;
   if(!baseTs){ alert("Missing base timestamp for update. Please reselect the task."); return; }
   payload[ATTR_MS_UPD_TS] = baseTs;
+
   var err = validatePayload(payload); if (err){ alert(err); return; }
+
   loading("Updating…"); busy(true);
   writeAttributes(payload, { mode:"update" })
     .then(function(){
@@ -747,187 +608,143 @@ function onUpdate(){
     .catch(function(e){ console.error(e); alert(e.message||"Failed to update"); })
     .finally(function(){ busy(false); });
 }
-$("#btnCancel").addEventListener("click", function(){
-  if(!state.selectedEvent){ alert("Select a task first."); return; }
-  if(!confirm("Cancel this maintenance task?")) return;
-  var p = state.selectedEvent.extendedProps;
-  var payload = {
-    MS_Title: p.MS_Title || "",
-    MS_Machine: p.MS_Machine || "",
-    MS_Type: p.MS_Type || "Preventive",
-    MS_Priority: p.MS_Priority != null ? p.MS_Priority : 3,
-    MS_Date: p.MS_Date || null,
-    MS_Start: p.MS_Start,
-    MS_End: p.MS_End,
-    MS_Status: "Cancelled",
-    MS_Description: p.MS_Description || "",
-    MS_Technicians: p.MS_Technicians || "",
-    MS_Task: p.MS_Task || ""
-  };
-  payload[ATTR_MS_UPD_TS] = p.__ts;
-  loading("Cancelling…"); busy(true);
-  writeAttributes(payload, { mode:"cancel" })
-    .then(function(){
-      startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
-        return String(found.extendedProps.MS_Status).toLowerCase()==="cancelled";
-      });
-    })
-    .catch(err=>{ console.error(err); alert(err.message||"Failed to cancel"); })
-    .finally(()=>{ busy(false); });
+
+/************ PDF (Download) ************/
+$("#btnPDF").addEventListener("click", function(){
+  if (!state.selectedEvent){ alert("Select a task first."); return; }
+  generatePdf(state.selectedEvent);
 });
 
-/************ REPORT (PDF) ************/
-function buildReportHTML(p){
-  var tasks = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
-  var duration = durationHHMM(p.MS_Start, p.MS_End);
+function generatePdf(ev){
+  var p = ev.extendedProps;
+  var idTs = String(p.__ts || ev.start?.getTime() || Date.now());
+  var reportNo = idTs;
   var genOn = new Date().toLocaleString();
-  var reportNo = (p.MS_Date ? new Date(Number(p.MS_Date)).toISOString().slice(0,10) : "NA") + "-" + (p.__ts||"");
-  // Simple table rows for checklist
-  var taskRows = tasks.length ? tasks.map(function(t, i){
-    return '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(t)+'</td><td>☐</td><td></td><td></td><td></td></tr>';
-  }).join('') : '<tr><td colspan="6" style="text-align:center;color:#6b7280">No checklist items</td></tr>';
+  var schDate = p.MS_Date ? new Date(Number(p.MS_Date)) : new Date(p.MS_Start);
+  var durMin = Math.max(0, Math.round((Number(p.MS_End) - Number(p.MS_Start))/60000));
+  var durHr = Math.floor(durMin/60), remMin = durMin%60;
+  var durationText = (durHr?durHr+"h ":"") + remMin + "m";
+  var tasks = String(p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
 
-  return `
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Maintenance Task Report</title>
-<style>
-  body{font:14px/1.4 system-ui,Segoe UI,Roboto,Arial;color:#111;margin:24px}
-  .row{display:flex;align-items:center;justify-content:space-between}
-  .brand{display:flex;align-items:center;gap:12px}
-  .brand img{height:28px}
-  h1{font-size:18px;margin:4px 0}
-  .muted{color:#6b7280}
-  .section{margin-top:16px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
-  .section h2{margin:0;padding:10px 12px;background:#f1f5f9;font-size:14px}
-  .section .body{padding:12px}
-  .grid{display:grid;grid-template-columns:200px 1fr;gap:6px}
-  .grid div:first-child{color:#6b7280}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{border:1px solid #e5e7eb;padding:6px 8px}
-  thead th{background:#f8fafc}
-  .footer{margin-top:16px;font-size:12px;color:#6b7280;display:flex;justify-content:space-between}
-  .signs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px}
-  .sign{border-top:1px dashed #cbd5e1;padding-top:6px;text-align:center}
-  .banners{display:flex;gap:8px;margin-top:8px}
-  .banner{flex:1;background:#0f172a;color:#fff;padding:6px 10px;border-radius:8px;font-weight:700}
-  .logos{display:flex;align-items:center;gap:12px}
-  .logos img{height:24px}
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="logos">
-      <img src="PimaLogo.png" alt="Company">
-      <img src="PlantwizLogo.png" alt="PlantWiz">
+  var root = document.createElement("div");
+  root.className = "r-wrap";
+  root.innerHTML = `
+    <div class="r-head">
+      <div class="logos"><img src="./PlantwizLogo.png" onerror="this.style.display='none'"></div>
+      <div class="r-title">
+        <h1>Pima Controls Pvt. Ltd</h1>
+        <div class="addr">Block No.298, Nr. Bacha Motors, Sanathal Cross Road, Ahmedabad (382210)</div>
+      </div>
+      <div class="logos"><img src="./PimaLogo.png" onerror="this.style.display='none'"></div>
     </div>
-    <div class="muted">Generated On: ${escapeHtml(genOn)}</div>
-  </div>
 
-  <h1>Maintenance Task Report</h1>
-  <div class="muted">Report No.: ${escapeHtml(reportNo)}</div>
-
-  <div class="banners">
-    <div class="banner">Summary</div>
-    <div class="banner">Checklist</div>
-  </div>
-
-  <div class="section">
-    <h2>Task Summary</h2>
-    <div class="body">
-      <div class="grid">
-        <div>Title</div><div>${escapeHtml(p.MS_Title||"-")}</div>
-        <div>Machine / Asset</div><div>${escapeHtml(p.MS_Machine||"-")}</div>
-        <div>Type</div><div>${escapeHtml(p.MS_Type||"-")}</div>
-        <div>Priority</div><div>${escapeHtml(String(p.MS_Priority??""))}</div>
-        <div>Status</div><div>${escapeHtml(p.MS_Status||"-")}</div>
-        <div>Scheduled Date</div><div>${p.MS_Date ? new Date(Number(p.MS_Date)).toLocaleDateString() : "-"}</div>
-        <div>Window</div><div>${escapeHtml(fmtDateTime(p.MS_Start))} – ${escapeHtml(fmtDateTime(p.MS_End))} (Duration ${escapeHtml(duration)})</div>
-        <div>Technicians</div><div>${escapeHtml(p.MS_Technicians||"-")}</div>
+    <div style="display:flex;justify-content:space-between;margin:-6px 0 8px 0;font-size:11px;color:#374151;">
+      <div></div>
+      <div class="r-meta">
+        <div><strong>Report No:</strong> ${escapeHtml(reportNo)}</div>
+        <div><strong>Generated:</strong> ${escapeHtml(genOn)}</div>
       </div>
     </div>
-  </div>
 
-  <div class="section">
-    <h2>Checklist</h2>
-    <div class="body">
-      <table>
-        <thead><tr><th>#</th><th>Task Item</th><th>Done</th><th>Remarks</th><th>Checked By</th><th>Time</th></tr></thead>
-        <tbody>${taskRows}</tbody>
-      </table>
+    <div class="r-section">
+      <div class="r-sec-h">Maintenance Task Report</div>
+      <div class="r-grid">
+        <div class="r-card">
+          <table class="r-table" style="border:0;">
+            <tr><td style="border:0;padding:2px 0;"><strong>Title</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(p.MS_Title||"-")}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Machine / Asset</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(p.MS_Machine||"-")}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Type</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(p.MS_Type||"-")}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Priority</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(String(p.MS_Priority??"-"))}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Status</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(p.MS_Status||"-")}</td></tr>
+          </table>
+        </div>
+        <div class="r-card">
+          <table class="r-table" style="border:0;">
+            <tr><td style="border:0;padding:2px 0;"><strong>Scheduled Date</strong></td><td style="border:0;padding:2px 0;">${schDate.toLocaleDateString()}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Start</strong></td><td style="border:0;padding:2px 0;">${msToHHMM(p.MS_Start)}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>End</strong></td><td style="border:0;padding:2px 0;">${msToHHMM(p.MS_End)}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Duration</strong></td><td style="border:0;padding:2px 0;">${durationText}</td></tr>
+          </table>
+        </div>
+        <div class="r-card">
+          <table class="r-table" style="border:0;">
+            <tr><td style="border:0;padding:2px 0;"><strong>Technicians</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(p.MS_Technicians||"-")}</td></tr>
+            <tr><td style="border:0;padding:2px 0;"><strong>Report ID TS</strong></td><td style="border:0;padding:2px 0;">${escapeHtml(reportNo)}</td></tr>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="section">
-    <h2>Description / Notes</h2>
-    <div class="body">
-      <div>${(p.MS_Description && p.MS_Description.trim()) ? escapeHtml(p.MS_Description) : '<span class="muted">—</span>'}</div>
+    <div class="r-section">
+      <div class="r-sec-h">Description / Notes</div>
+      <div class="r-row">
+        <div class="box" style="grid-column:1/-1;">${escapeHtml(p.MS_Description||"-")}</div>
+      </div>
     </div>
-  </div>
 
-  <div class="section">
-    <h2>Approvals</h2>
-    <div class="body signs">
-      <div class="sign">Technician Sign &amp; Date</div>
-      <div class="sign">Supervisor Sign &amp; Date</div>
+    <div class="r-section">
+      <div class="r-sec-h">Checklist</div>
+      <div style="padding:10px;">
+        <table class="r-table">
+          <thead>
+            <tr>
+              <th style="width:32px;">#</th>
+              <th>Task Item</th>
+              <th style="width:56px;">Done</th>
+              <th>Remarks</th>
+              <th style="width:120px;">Checked By</th>
+              <th style="width:96px;">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ (tasks.length?tasks:["—"]).map((t,i)=>`
+              <tr>
+                <td>${i+1}</td>
+                <td>${escapeHtml(String(t))}</td>
+                <td>☐</td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>`).join('') }
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
 
-  <div class="footer">
-    <div>Generated by Maintenance Scheduler</div>
-    <div>Page 1</div>
-  </div>
+    <div class="r-section">
+      <div class="r-sec-h">Approvals</div>
+      <div class="r-foot">
+        <div class="sign">
+          <strong>Technician Sign & Date</strong>
+        </div>
+        <div class="sign">
+          <strong>Supervisor Sign & Date</strong>
+        </div>
+      </div>
+    </div>
 
-  <script>
-    // Ensure images are loaded before printing to avoid blank PDF
-    function allImagesLoaded(){
-      const imgs = Array.from(document.images);
-      return Promise.all(imgs.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(res => { img.onload = img.onerror = () => res(); });
-      }));
-    }
-    (async function(){
-      await allImagesLoaded();
-      // Give layout a moment to paint
-      setTimeout(()=>{ window.print(); }, 150);
-    })();
-  </script>
-</body></html>`;
+    <div class="r-fine">
+      <span>Generated by Maintenance Scheduler</span>
+      <span>Page 1 / 1</span>
+    </div>
+  `;
+
+  var pdfRoot = $("#pdfRoot");
+  pdfRoot.innerHTML = "";
+  pdfRoot.appendChild(root);
+
+  const opt = {
+    margin:       [10,10,10,10],
+    filename:     (p.MS_Title ? p.MS_Title.replace(/\s+/g,'_') : 'Maintenance_Task') + "_" + reportNo + ".pdf",
+    image:        { type: 'jpeg', quality: 0.95 },
+    html2canvas:  { scale: 2, useCORS: true, background: '#ffffff' },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['css','legacy'] }
+  };
+  html2pdf().from(root).set(opt).save();
 }
-
-function openReportAndDownload(p){
-  var html = buildReportHTML(p);
-  var w = window.open("", "_blank");
-  if (!w){ alert("Popup blocked. Please allow popups for this site."); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-}
-
-$("#btnPDF").addEventListener("click", function(){
-  var p = (state.selectedEvent && state.selectedEvent.extendedProps) ? state.selectedEvent.extendedProps : null;
-  if (!p){ alert("Select a task first to generate the report."); return; }
-  openReportAndDownload(p);
-});
 
 /************ BOOT ************/
-function injectLegends(calEl){
-  // Toolbar right chunk
-  const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
-  if (toolbar && !toolbar.querySelector(".legends")){
-    const legends = document.createElement("div");
-    legends.className = "fc-toolbar-chunk legends";
-    legends.innerHTML = `
-      <span><span class="legend-box legend-planned"></span> Planned</span>
-      <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
-      <span><span class="legend-box legend-completed"></span> Completed</span>
-      <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
-      <span><span class="legend-box legend-postponed"></span> Postponed</span>
-    `;
-    toolbar.appendChild(legends);
-  }
-}
-
 function startCalendar(){
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
@@ -944,10 +761,7 @@ function startCalendar(){
     height: "auto",
     eventContent: eventContent,
     dateClick: function(info){ openModalForDate(info.date); },
-    eventClick: function(info){
-      state.selectedEvent = info.event;
-      showDetails(info.event);
-    },
+    eventClick: function(info){ showDetails(info.event); },
     datesSet: function(info){
       loading("Loading…");
       state.lastRange = { start: info.start, end: info.end };
@@ -955,20 +769,35 @@ function startCalendar(){
         .then(function(events){
           state.lastEventsFull = events.slice();
           populateFilters(events);
-          refreshView();
-          // Re-inject legends (once)
-          injectLegends(calEl);
+          var filtered = applyFilters(events);
+          state.calendar.removeAllEvents(); state.calendar.addEventSource(filtered);
+          $("#details").className="empty"; $("#details").textContent="Select a task";
+          $("#sideActions").style.display="none";
+          loading("Loaded "+filtered.length+" task(s)");
         })
         .catch(function(err){
           console.error(err); loading(err.message || "Failed to load");
-          if (state.calendar) { state.calendar.removeAllEvents(); }
+          state.calendar.removeAllEvents();
         });
     }
   });
   state.calendar.render();
-  loading("");
-}
 
+  // Legends on toolbar right
+  const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
+  if (toolbar){
+    const legends = document.createElement("div");
+    legends.className = "fc-toolbar-chunk legends";
+    legends.innerHTML = `
+      <span><span class="legend-box legend-planned"></span> Planned</span>
+      <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
+      <span><span class="legend-box legend-completed"></span> Completed</span>
+      <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
+      <span><span class="legend-box legend-postponed"></span> Postponed</span>
+    `;
+    toolbar.appendChild(legends);
+  }
+}
 if (document.readyState==="complete" || document.readyState==="interactive") setTimeout(startCalendar,0);
 else document.addEventListener("DOMContentLoaded", startCalendar);
 </script>
