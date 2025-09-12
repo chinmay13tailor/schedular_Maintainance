@@ -28,36 +28,24 @@
   .kpi{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
   .kpi span:first-child{color:#64748b}
   .side-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .muted{color:#64748b}
-  #loading{font-size:12px;color:#64748b;margin-left:8px}
 
-  /* Modal */
-  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:50}
-  .modal{width:min(640px,92vw);background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.18)}
-  .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
-  .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
+  .fc .fc-toolbar{padding:10px}
+  .fc .fc-toolbar-title{font-size:16px;font-weight:800}
+  .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
+  .fc-theme-standard td,.fc-theme-standard th{border-color:var(--ring)}
+  .fc-daygrid-day-number{color:#64748b}
 
-  /* Tabs inside modal */
-  .tabs{display:flex;border-bottom:1px solid var(--ring);gap:6px;padding:0 12px}
-  .tab-btn{border:0;background:transparent;padding:10px 8px;cursor:pointer;font-weight:800;color:#475569}
-  .tab-btn.active{color:#0f172a;border-bottom:2px solid #0f172a}
-  .tab-pane{display:none;padding:14px;gap:10px;grid-template-columns:1fr 1fr}
-  .tab-pane.active{display:grid}
-  .row-full{grid-column:1 / -1}
-  .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
-
-  /* chips (for technicians & tasks) */
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
-  .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;line-height:1}
-  .row-inline{display:flex;gap:8px;align-items:center}
-
-  /* Event coloring */
   .event{border-radius:10px;border:0;padding:6px 8px;color:#fff;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.08),0 8px 16px -12px rgba(0,0,0,.25)}
   .status-planned{background:var(--blue)}
   .status-inprogress{background:var(--amber)}
   .status-completed{background:var(--green)}
   .status-cancelled{background:var(--red)}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--ring);border-radius:999px;font-size:12px;background:#f8fafc}
+  .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;line-height:1}
+
+  #loading{font-size:12px;color:#64748b;margin-left:8px}
 </style>
 </head>
 <body>
@@ -73,9 +61,9 @@
     <h3 class="h6">Maintenance details</h3>
     <div id="details" class="empty">Select a task on the calendar</div>
     <div class="side-actions" id="sideActions" style="display:none">
+      <button class="btn ghost"   id="btnNew"    type="button">New</button>
+      <button class="btn primary" id="btnEdit"   type="button">Update</button>
       <button class="btn danger"  id="btnCancel" type="button">Cancel</button>
-      <button class="btn ghost"   id="btnEdit"   type="button">Update</button>
-      <button class="btn primary" id="btnNew"    type="button">New</button>
     </div>
   </aside>
 </div>
@@ -84,95 +72,79 @@
 <div class="overlay" id="overlay">
   <div class="modal">
     <header>
-      <div style="font-weight:900" id="modalTitle">Add maintenance</div>
+      <div style="font-weight:900" id="modalTitle">Add maintenance task</div>
       <button class="btn" id="closeModal" type="button">Close</button>
     </header>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-details">Details</button>
-      <button class="tab-btn" data-tab="tab-tasks">Tasks</button>
-    </div>
-
-    <!-- Tab panes -->
-    <div id="tab-details" class="tab-pane active">
-      <div class="row-full">
+    <div class="body">
+      <div>
         <label>Title</label>
-        <input id="fTitle" class="input" type="text" placeholder="e.g., Preventive – Spindle lubrication">
+        <input id="fTitle" class="input" type="text" placeholder="e.g., Weekly lubrication">
       </div>
       <div>
         <label>Machine</label>
         <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
       </div>
+
       <div>
         <label>Type</label>
         <select id="fType" class="input">
-          <option>Preventive</option><option>Corrective</option><option>Calibration</option>
-          <option>Inspection</option><option>Others</option>
+          <option>Preventive</option>
+          <option>Predictive</option>
+          <option>Breakdown</option>
+          <option>Calibration</option>
+          <option>Inspection</option>
         </select>
       </div>
       <div>
-        <label>Priority (1–5)</label>
+        <label>Priority</label>
         <select id="fPriority" class="input">
-          <option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option>
+          <option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option>
         </select>
       </div>
+
+      <div>
+        <label>Time From</label>
+        <input id="fTimeFrom" class="input" type="time" value="09:00">
+      </div>
+      <div>
+        <label>Time To</label>
+        <input id="fTimeTo" class="input" type="time" value="11:00">
+      </div>
+
       <div>
         <label>Status</label>
         <select id="fStatus" class="input">
-          <option>Planned</option><option>In-Progress</option><option>Completed</option>
-          <option>Cancelled</option><option>Postponed</option>
+          <option>Planned</option>
+          <option>In-Progress</option>
+          <option>Completed</option>
+          <option>Cancelled</option>
         </select>
       </div>
       <div>
-        <label>Date</label>
-        <input id="fDate" class="input" type="date">
+        <label>Technicians</label>
+        <input id="fTechs" class="input" type="text" placeholder="comma-separated e.g., Jatin, Vimal">
       </div>
-      <div>
-        <label>Start</label>
-        <input id="fStart" class="input" type="time" value="09:00">
-      </div>
-      <div>
-        <label>End</label>
-        <input id="fEnd" class="input" type="time" value="11:00">
-      </div>
+
       <div class="row-full">
         <label>Description</label>
-        <textarea id="fDesc" class="input" rows="2" placeholder="Short notes"></textarea>
+        <textarea id="fDesc" class="input" rows="2" placeholder="Optional notes"></textarea>
       </div>
 
+      <!-- Tasks (chips -> stored as comma-separated MS_Task) -->
       <div class="row-full">
-        <label>Technician(s)</label>
-        <div class="row-inline">
-          <input id="techOne" class="input" type="text" placeholder="Type a name and click +">
-          <button class="btn ghost" id="addTechBtn" type="button">+</button>
-        </div>
-        <div id="techChips" class="chips"></div>
-      </div>
-    </div>
-
-    <div id="tab-tasks" class="tab-pane">
-      <div class="row-full">
-        <label>Task point</label>
-        <div class="row-inline">
-          <input id="taskOne" class="input" type="text" placeholder="e.g., Check oil level">
+        <label>Tasks / Checklist</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="taskOne" class="input" type="text" placeholder="Type a task and click +">
           <button class="btn ghost" id="addTaskBtn" type="button">+</button>
         </div>
         <div id="taskChips" class="chips"></div>
-        <div class="muted" style="margin-top:6px">These will be saved to <code>MS_Task</code> as a comma-separated list.</div>
+        <div class="muted" style="font-size:12px;margin-top:6px">These are saved in <code>MS_Task</code> (comma-separated).</div>
       </div>
-      <div class="row-full">
-        <label>Bulk add (optional)</label>
-        <textarea id="taskBulk" class="input" rows="3" placeholder="Paste multiple lines; we’ll split to tasks"></textarea>
-        <div class="row-inline" style="margin-top:6px">
-          <button class="btn" id="btnBulkToChips" type="button">Add all as tasks</button>
-          <span class="muted">Duplicates are ignored.</span>
-        </div>
-      </div>
-    </div>
 
+      <div class="row-full muted" id="fDateHint">Date: —</div>
+    </div>
     <footer>
-      <button class="btn primary" id="saveBtn" type="button">Save</button>
+      <button class="btn primary" id="saveSession" type="button">Save</button>
     </footer>
   </div>
 </div>
@@ -185,93 +157,100 @@ var API_BASE  = ORIGIN + "/api";
 var DEVICE_ID = "991cf500-661a-11f0-90f1-775fee303094";
 var JWT       = new URLSearchParams(location.search).get("token")  || "";
 
-/* Rule-chain flags */
-var ATTR_MS_SAVE_FLAG   = "MS_Save_Button";       // false on create
-var ATTR_MS_UPDATE_FLAG = "MS_Update_Buttton";    // true on update/cancel (intentional spelling)
-var ATTR_MS_UPDATE_TS   = "MS_Update_Timestamp";  // base ts to rewrite
-
-/* Telemetry keys (read) */
+// Telemetry keys for Maintenance
 var KEYS = [
-  "MS_Title","MS_Machine","MS_Type","MS_Priority","MS_Date","MS_Start","MS_End",
-  "MS_Status","MS_Description","MS_Technicians","MS_Task"
+  "MS_Title","MS_Machine","MS_Type","MS_Priority",
+  "MS_Date","MS_Start","MS_End","MS_Status",
+  "MS_Description","MS_Technicians","MS_Task"
 ];
 
-/************ STATE & HELPERS ************/
+/************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
 function loading(t){ $("#loading").textContent = t || ""; }
-var state = {
-  calendar:null, lastRange:null, selectedEvent:null, mode:"create",
-  techs:[], tasks:[]
-};
-function mergeDateAndTime(dateStr, hhmm){
-  // dateStr: "YYYY-MM-DD" (local), hhmm: "HH:MM"
-  var d = new Date(dateStr+"T00:00:00");
-  var parts = String(hhmm||"00:00").split(":");
-  d.setHours(parseInt(parts[0]||"0",10), parseInt(parts[1]||"0",10), 0, 0);
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>\"']/g, m => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]
+  ));
+}
+function midnightMs(yyyy_mm_dd){
+  // yyyy-mm-dd -> local midnight ms
+  var parts = String(yyyy_mm_dd).split("-");
+  var d = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]), 0,0,0,0);
   return d.getTime();
 }
-function midnightMs(dateStr){
-  var d = new Date(dateStr+"T00:00:00"); d.setHours(0,0,0,0); return d.getTime();
+function mergeDateTime(baseDate, hhmm){
+  var parts = String(hhmm||"00:00").split(":");
+  var h = parseInt(parts[0]||"0",10), m = parseInt(parts[1]||"0",10);
+  var d = new Date(baseDate); d.setHours(h||0, m||0, 0, 0);
+  return d.getTime();
 }
-function msToHHMM(ms){ var d=new Date(ms); return String(d.getHours()).padStart(2,'0')+":"+String(d.getMinutes()).padStart(2,'0'); }
+function msToHHMM(ms){
+  var d = new Date(ms);
+  return String(d.getHours()).padStart(2,'0') + ":" + String(d.getMinutes()).padStart(2,'0');
+}
 function colorByStatus(s){
   var v = String(s||"Planned").toLowerCase();
   if (v==="cancelled") return "status-cancelled";
-  if (v==="in-progress" || v==="inprogress") return "status-inprogress";
   if (v==="completed") return "status-completed";
+  if (v==="in-progress" || v==="inprogress") return "status-inprogress";
   return "status-planned";
 }
-function eventContent(arg){
-  const p = arg.event.extendedProps;
-  const d = new Date(p.MS_Start), hr=d.getHours()%12||12, am=d.getHours()>=12?"PM":"AM";
-  const time = String(hr).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+" "+am;
-  const title = p.MS_Title || "Maintenance";
-  return { html: '<span>'+time+' — '+title+'</span>' };
+function fmtTime(ms){
+  var d = new Date(ms), h = d.getHours()%12 || 12;
+  var ampm = d.getHours()>=12 ? "PM":"AM";
+  return String(h).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+" "+ampm;
 }
 
-/************ READ ************/
+var state = {
+  calendar:null, clickedDate:null, lastRange:null, selectedEvent:null, mode:"create",
+  taskList:[]
+};
+
+/************ READ (FIXED) ************/
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
-  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
-          + "?keys=" + encodeURIComponent(KEYS.join(",")) +
-            "&startTs=" + rangeStart.getTime() +
-            "&endTs="   + rangeEnd.getTime() +
-            "&limit=5000";
+  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
+            + "?keys=" + encodeURIComponent(KEYS.join(","))
+            + "&startTs=" + rangeStart.getTime()
+            + "&endTs="   + rangeEnd.getTime()
+            + "&limit=5000";
+
   return fetch(url, { headers: { "X-Authorization": "Bearer " + JWT } })
-    .then(res => res.ok ? res.json() : res.text().then(t => { throw new Error("Timeseries read failed: "+t); })))
+    .then(res => res.ok ? res.json()
+                        : res.text().then(t => { throw new Error("Timeseries read failed: " + t); }))
     .then(tsObj => {
       const map = {};
       Object.keys(tsObj||{}).forEach(k=>{
         (tsObj[k]||[]).forEach(p=>{
-          const ts=Number(p.ts);
-          const rec = map[ts] || (map[ts]={ts});
+          const ts = Number(p.ts);
+          const rec = map[ts] || (map[ts] = { ts });
           rec[k] = p.value;
         });
       });
-      const out=[];
+      const out = [];
       Object.keys(map).forEach(tsStr=>{
         const r = map[tsStr];
-        const st = Number(r.MS_Start||r.ts);
-        const en = Number(r.MS_End||st+60*60*1000);
-        const title = String(r.MS_Title||"Maintenance");
+        const st = Number(r.MS_Start || r.ts);
+        const en = Number(r.MS_End || (st + 60*60*1000));
+        const title = String(r.MS_Title || "Maintenance");
         out.push({
-          id:"ts-"+r.ts,
+          id: "ts-"+r.ts,
           title,
-          start:new Date(st),
-          end:new Date(en),
-          classNames:["event", colorByStatus(r.MS_Status)],
-          extendedProps:{
-            MS_Title:r.MS_Title||"",
-            MS_Machine:r.MS_Machine||"",
-            MS_Type:r.MS_Type||"",
-            MS_Priority:r.MS_Priority||"",
-            MS_Date: Number(r.MS_Date||midnightMs(new Date(st).toISOString().slice(0,10))),
-            MS_Start:st, MS_End:en,
-            MS_Status:r.MS_Status||"Planned",
-            MS_Description:r.MS_Description||"",
-            MS_Technicians:r.MS_Technicians||"",
-            MS_Task:r.MS_Task||"",
-            __ts:r.ts
+          start: new Date(st),
+          end:   new Date(en),
+          classNames: ["event", colorByStatus(r.MS_Status)],
+          extendedProps: {
+            MS_Title: r.MS_Title || "",
+            MS_Machine: r.MS_Machine || "",
+            MS_Type: r.MS_Type || "",
+            MS_Priority: r.MS_Priority || "",
+            MS_Date: Number(r.MS_Date || midnightMs(new Date(st).toISOString().slice(0,10))),
+            MS_Start: st, MS_End: en,
+            MS_Status: r.MS_Status || "Planned",
+            MS_Description: r.MS_Description || "",
+            MS_Technicians: r.MS_Technicians || "",
+            MS_Task: r.MS_Task || "",
+            __ts: r.ts
           }
         });
       });
@@ -280,277 +259,268 @@ function readRange(rangeStart, rangeEnd){
     });
 }
 
-/************ AUTO-REFRESH (5s, 3 min max) ************/
-var _autoTimer=null,_autoDeadline=0;
-function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
-function startAutoRefresh(expectedTs, predicate){
-  stopAutoRefresh(); _autoDeadline = Date.now()+3*60*1000;
-  _autoTimer = setInterval(function(){
-    if(Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped: timeout waiting for telemetry update"); return; }
-    if(!state.lastRange) return;
-    readRange(state.lastRange.start, state.lastRange.end).then(function(events){
-      state.calendar.removeAllEvents(); state.calendar.addEventSource(events);
-      loading("Loaded "+events.length+" task(s) — auto-refreshing…");
-      if(expectedTs!=null){
-        const found = events.find(ev => String(ev.extendedProps.__ts)===String(expectedTs));
-        if(found){
-          if(typeof predicate==="function"){
-            try{ if(predicate(found)){ stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){}
-          } else { stopAutoRefresh(); loading("Update detected ✓"); }
-        }
-      }
-    }).catch(err=>{ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
-  },5000);
+/************ EVENT RENDER ************/
+function eventContent(arg){
+  const p = arg.event.extendedProps;
+  const time = fmtTime(p.MS_Start);
+  const title = p.MS_Title || "Maintenance";
+  return { html: '<span>'+escapeHtml(time)+' — '+escapeHtml(title)+'</span>' };
 }
 
 /************ WRITE ************/
-function writeAttributes(payload, opts){
+function writeAttributes(payload){
   if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
   const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
   const body = {
-    MS_Title: payload.MS_Title,
-    MS_Machine: payload.MS_Machine,
-    MS_Type: payload.MS_Type,
-    MS_Priority: payload.MS_Priority,
+    MS_Title: payload.MS_Title || "",
+    MS_Machine: payload.MS_Machine || "",
+    MS_Type: payload.MS_Type || "",
+    MS_Priority: payload.MS_Priority || "",
     MS_Date: payload.MS_Date,
     MS_Start: payload.MS_Start,
     MS_End: payload.MS_End,
-    MS_Status: payload.MS_Status,
+    MS_Status: payload.MS_Status || "Planned",
     MS_Description: payload.MS_Description || "",
     MS_Technicians: payload.MS_Technicians || "",
     MS_Task: payload.MS_Task || ""
   };
-  if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE_FLAG] = false;
-  } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
-    body[ATTR_MS_UPDATE_FLAG] = true;
-    if (payload[ATTR_MS_UPDATE_TS]) body[ATTR_MS_UPDATE_TS] = payload[ATTR_MS_UPDATE_TS];
-  }
-  return fetch(url,{
-    method:"POST",
-    headers:{ "X-Authorization":"Bearer "+JWT, "Content-Type":"application/json" },
+  return fetch(url, {
+    method: "POST",
+    headers: { "X-Authorization": "Bearer " + JWT, "Content-Type": "application/json" },
     body: JSON.stringify(body)
-  }).then(res=>res.ok?null:res.text().then(t=>{throw new Error("Attribute write failed: "+t);})); 
+  }).then(res => res.ok ? null : res.text().then(t => { throw new Error("Attribute write failed: " + t); }));
 }
 
-/************ DETAILS PANEL ************/
+/************ DETAILS ************/
 function showDetails(ev){
   state.selectedEvent = ev;
   const p = ev.extendedProps;
-  const fmt = v => v ? new Date(Number(v)).toLocaleString() : "-";
-  const tasks = String(p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const tasks = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  function fmt(v){ return v ? new Date(Number(v)).toLocaleString() : "-"; }
+
   $("#details").className = "";
   $("#details").innerHTML =
     '<div class="kpi">'+
-      '<span>Base ts</span><span>'+String(p.__ts||"-")+'</span>'+
       '<span>Title</span><span>'+escapeHtml(p.MS_Title||"-")+'</span>'+
       '<span>Machine</span><span>'+escapeHtml(p.MS_Machine||"-")+'</span>'+
       '<span>Type</span><span>'+escapeHtml(p.MS_Type||"-")+'</span>'+
       '<span>Priority</span><span>'+escapeHtml(p.MS_Priority||"-")+'</span>'+
-      '<span>Status</span><span>'+escapeHtml(p.MS_Status||"-")+'</span>'+
-      '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
+      '<span>Status</span><span>'+escapeHtml(p.MS_Status||"Planned")+'</span>'+
+      '<span>Date</span><span>'+fmt(p.MS_Date)+'</span>'+
       '<span>Start</span><span>'+fmt(p.MS_Start)+'</span>'+
       '<span>End</span><span>'+fmt(p.MS_End)+'</span>'+
+      '<span>Technicians</span><span>'+escapeHtml(p.MS_Technicians||"-")+'</span>'+
       '<span>Description</span><span>'+escapeHtml(p.MS_Description||"-")+'</span>'+
-      '<span>Tasks</span><span>'+ (tasks.length? ('<ul style="margin:0;padding-left:18px">'+tasks.map(t=>'<li>'+escapeHtml(t)+'</li>').join('')+'</ul>'):'-') +'</span>'+
+      '<span>Tasks</span><span>'+ (tasks.length?('<ul style="margin:6px 0;padding-left:18px">'+tasks.map(t=>'<li>'+escapeHtml(t)+'</li>').join('')+'</ul>'):'-') +'</span>'+
     '</div>';
   $("#sideActions").style.display = "flex";
 }
 
-/************ MODAL: tabs, chips ************/
-var overlay=$("#overlay");
-function switchTab(id){
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===id));
-  document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active", p.id===id));
-}
-document.querySelectorAll(".tab-btn").forEach(b=>{
-  b.addEventListener("click", ()=>switchTab(b.dataset.tab));
-});
+/************ MODAL + TASK CHIPS ************/
+var overlay = $("#overlay");
+function busy(on){ ["saveSession","btnCancel","btnEdit","btnNew"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; }); }
 
-function refreshChips(list, boxSel){
-  const box=$(boxSel); box.innerHTML="";
-  list.forEach((val,idx)=>{
-    const el=document.createElement("span");
-    el.className="chip";
-    el.innerHTML='<span>'+escapeHtml(val)+'</span><button type="button">✕</button>';
-    el.querySelector("button").addEventListener("click", ()=>{ list.splice(idx,1); refreshChips(list,boxSel); });
-    box.appendChild(el);
+function refreshTaskChips(){
+  const box = $("#taskChips"); box.innerHTML="";
+  state.taskList.forEach((t,idx)=>{
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.innerHTML = '<span>'+escapeHtml(t)+'</span><button type="button" aria-label="Remove">✕</button>';
+    chip.querySelector("button").addEventListener("click", ()=>{ state.taskList.splice(idx,1); refreshTaskChips(); });
+    box.appendChild(chip);
   });
 }
-function addTo(list, inputSel, boxSel){
-  const raw = ($(inputSel).value||"").trim();
-  if(!raw) return;
-  if(!list.includes(raw)) list.push(raw);
-  $(inputSel).value=""; refreshChips(list, boxSel);
+function addOneTask(){
+  const v = ($("#taskOne").value||"").trim();
+  if(!v) return;
+  state.taskList.push(v);
+  $("#taskOne").value="";
+  refreshTaskChips();
 }
-$("#addTechBtn").addEventListener("click", ()=>addTo(state.techs, "#techOne", "#techChips"));
-$("#techOne").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addTo(state.techs, "#techOne", "#techChips"); } });
+$("#addTaskBtn").addEventListener("click", addOneTask);
+$("#taskOne").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addOneTask(); } });
 
-$("#addTaskBtn").addEventListener("click", ()=>addTo(state.tasks, "#taskOne", "#taskChips"));
-$("#taskOne").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addTo(state.tasks, "#taskOne", "#taskChips"); } });
+$("#closeModal").addEventListener("click", function(){ overlay.style.display="none"; });
+$("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
 
-$("#btnBulkToChips").addEventListener("click", ()=>{
-  const lines = ($("#taskBulk").value||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  lines.forEach(l=>{ if(!state.tasks.includes(l)) state.tasks.push(l); });
-  $("#taskBulk").value=""; refreshChips(state.tasks, "#taskChips");
-});
-
-/************ CREATE / UPDATE / CANCEL ************/
-function openModal(date){
-  state.mode="create";
-  $("#modalTitle").textContent="Add maintenance"; $("#saveBtn").textContent="Save";
-  // Defaults
-  $("#fTitle").value=""; $("#fMachine").value=""; $("#fType").value="Preventive";
-  $("#fPriority").value="2"; $("#fStatus").value="Planned";
-  const d = date || new Date();
-  const iso = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0,10);
-  $("#fDate").value = iso; $("#fStart").value="09:00"; $("#fEnd").value="11:00";
-  $("#fDesc").value="";
-  state.techs=[]; refreshChips(state.techs, "#techChips");
-  state.tasks=[]; refreshChips(state.tasks, "#taskChips"); $("#taskBulk").value="";
-  switchTab("tab-details");
-  overlay.style.display="flex";
-}
-function collectPayload(){
-  const dateStr = $("#fDate").value;
-  return {
-    MS_Title: ($("#fTitle").value||"").trim(),
-    MS_Machine: ($("#fMachine").value||"").trim(),
-    MS_Type: $("#fType").value,
-    MS_Priority: $("#fPriority").value,
-    MS_Date: midnightMs(dateStr),
-    MS_Start: mergeDateAndTime(dateStr, $("#fStart").value),
-    MS_End:   mergeDateAndTime(dateStr, $("#fEnd").value),
-    MS_Status: $("#fStatus").value,
-    MS_Description: ($("#fDesc").value||"").trim(),
-    MS_Technicians: state.techs.join(", "),
-    MS_Task: state.tasks.join(", ")
-  };
-}
-function validatePayload(p){
-  const must = [
-    ["Title", p.MS_Title],
-    ["Machine", p.MS_Machine],
-    ["Date", p.MS_Date],
-    ["Start/End time", (p.MS_End>p.MS_Start)]
-  ];
-  for (let i=0;i<must.length;i++){ if(!must[i][1]) return "Please provide "+must[i][0]; }
-  return "";
-}
-
-$("#btnNew").addEventListener("click", ()=>openModal(new Date()));
-$("#closeModal").addEventListener("click", ()=>overlay.style.display="none");
-
-$("#saveBtn").addEventListener("click", function(){
-  if(state.mode==="update") return onUpdate();
-  return onCreate();
+$("#saveSession").addEventListener("click", function(){
+  if (state.mode === "update") onUpdate();
+  else onCreate();
 });
 
 $("#btnEdit").addEventListener("click", function(){
   if(!state.selectedEvent){ alert("Select a task first."); return; }
   const p = state.selectedEvent.extendedProps;
-  state.mode="update"; $("#modalTitle").textContent="Update maintenance"; $("#saveBtn").textContent="Update";
-  // Fill
-  $("#fTitle").value = p.MS_Title||"";
-  $("#fMachine").value = p.MS_Machine||"";
-  $("#fType").value = p.MS_Type||"Preventive";
-  $("#fPriority").value = String(p.MS_Priority||"2");
-  $("#fStatus").value = p.MS_Status||"Planned";
-  const iso = new Date(Number(p.MS_Date||p.MS_Start)).toISOString().slice(0,10);
-  $("#fDate").value = iso;
-  $("#fStart").value = msToHHMM(p.MS_Start);
-  $("#fEnd").value   = msToHHMM(p.MS_End);
-  $("#fDesc").value  = p.MS_Description||"";
-  state.techs = String(p.MS_Technicians||"").split(",").map(s=>s.trim()).filter(Boolean);
-  state.tasks = String(p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
-  refreshChips(state.techs, "#techChips");
-  refreshChips(state.tasks, "#taskChips");
-  switchTab("tab-details");
+
+  state.mode="update";
+  $("#modalTitle").textContent="Update maintenance task";
+  $("#saveSession").textContent="Update";
+
+  const base = new Date(p.MS_Date || p.MS_Start);
+  state.clickedDate = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+
+  $("#fTitle").value     = p.MS_Title || "";
+  $("#fMachine").value   = p.MS_Machine || "";
+  $("#fType").value      = p.MS_Type || "Preventive";
+  $("#fPriority").value  = p.MS_Priority || "Medium";
+  $("#fTimeFrom").value  = msToHHMM(p.MS_Start);
+  $("#fTimeTo").value    = msToHHMM(p.MS_End);
+  $("#fStatus").value    = p.MS_Status || "Planned";
+  $("#fTechs").value     = p.MS_Technicians || "";
+  $("#fDesc").value      = p.MS_Description || "";
+  state.taskList         = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  refreshTaskChips();
+
+  $("#fDateHint").textContent = "Date: " + state.clickedDate.toDateString();
   overlay.style.display="flex";
 });
 
 $("#btnCancel").addEventListener("click", function(){
   if(!state.selectedEvent){ alert("Select a task first."); return; }
   if(!confirm("Cancel this maintenance task?")) return;
+
   const p = state.selectedEvent.extendedProps;
   const payload = {
-    MS_Title:p.MS_Title, MS_Machine:p.MS_Machine, MS_Type:p.MS_Type,
-    MS_Priority:p.MS_Priority, MS_Date:p.MS_Date, MS_Start:p.MS_Start, MS_End:p.MS_End,
-    MS_Status:"Cancelled", MS_Description:p.MS_Description,
-    MS_Technicians:p.MS_Technicians, MS_Task:p.MS_Task
+    MS_Title: p.MS_Title, MS_Machine: p.MS_Machine, MS_Type: p.MS_Type, MS_Priority: p.MS_Priority,
+    MS_Date: p.MS_Date, MS_Start: p.MS_Start, MS_End: p.MS_End,
+    MS_Status: "Cancelled",
+    MS_Description: p.MS_Description, MS_Technicians: p.MS_Technicians, MS_Task: p.MS_Task
   };
-  payload[ATTR_MS_UPDATE_TS] = p.__ts;
-  loading("Cancelling…");
-  writeAttributes(payload, {mode:"cancel"}).then(()=>{
-    startAutoRefresh(payload[ATTR_MS_UPDATE_TS], found => String(found.extendedProps.MS_Status).toLowerCase()==="cancelled");
-  }).catch(err=>{ console.error(err); alert(err.message||"Failed to cancel"); });
+
+  loading("Cancelling…"); busy(true);
+  writeAttributes(payload)
+    .then(()=>{ // simple reload after cancel
+      if(state.lastRange){
+        return readRange(state.lastRange.start, state.lastRange.end).then(events=>{
+          state.calendar.removeAllEvents(); state.calendar.addEventSource(events);
+          $("#details").className="empty"; $("#details").textContent="Select a task on the calendar";
+          $("#sideActions").style.display="none"; loading("Loaded "+events.length+" task(s)");
+        });
+      }
+    })
+    .catch(e=>{ console.error(e); alert(e.message||"Failed to cancel"); })
+    .finally(()=>busy(false));
 });
 
+/************ CREATE / UPDATE ************/
+function openModalForDate(jsDate){
+  state.mode="create";
+  state.clickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
+  $("#modalTitle").textContent="Add maintenance task";
+  $("#saveSession").textContent="Save";
+  $("#fDateHint").textContent = "Date: " + state.clickedDate.toDateString();
+
+  $("#fTitle").value=""; $("#fMachine").value="";
+  $("#fType").value="Preventive"; $("#fPriority").value="Medium";
+  $("#fTimeFrom").value="09:00"; $("#fTimeTo").value="11:00";
+  $("#fStatus").value="Planned"; $("#fTechs").value=""; $("#fDesc").value="";
+  state.taskList=[]; refreshTaskChips();
+
+  overlay.style.display="flex";
+}
+function collectPayload(base){
+  return {
+    MS_Title: ($("#fTitle").value||"").trim(),
+    MS_Machine: ($("#fMachine").value||"").trim(),
+    MS_Type: $("#fType").value||"Preventive",
+    MS_Priority: $("#fPriority").value||"Medium",
+    MS_Date: midnightMs(base.getFullYear()+"-"+String(base.getMonth()+1).padStart(2,"0")+"-"+String(base.getDate()).padStart(2,"0")),
+    MS_Start: mergeDateTime(base, $("#fTimeFrom").value),
+    MS_End:   mergeDateTime(base, $("#fTimeTo").value),
+    MS_Status: $("#fStatus").value||"Planned",
+    MS_Description: ($("#fDesc").value||"").trim(),
+    MS_Technicians: ($("#fTechs").value||"").trim(),
+    MS_Task: state.taskList.join(", ")
+  };
+}
+function validatePayload(p){
+  const must = [
+    ["Title", p.MS_Title],
+    ["Machine", p.MS_Machine]
+  ];
+  for (let i=0;i<must.length;i++){ if(!must[i][1]) return "Please enter "+must[i][0]; }
+  if (p.MS_End <= p.MS_Start) return "Time To must be after Time From.";
+  return "";
+}
 function onCreate(){
-  const payload = collectPayload();
+  const base = state.clickedDate || new Date();
+  const payload = collectPayload(base);
   const err = validatePayload(payload); if(err){ alert(err); return; }
-  loading("Saving…");
-  writeAttributes(payload, {mode:"create"}).then(()=>{
-    overlay.style.display="none";
-    // RC should write telemetry at ts = MS_Start
-    startAutoRefresh(payload.MS_Start, null);
-  }).catch(err=>{ console.error(err); alert(err.message||"Failed to save"); });
+
+  loading("Saving…"); busy(true);
+  writeAttributes(payload)
+    .then(()=>{ overlay.style.display="none";
+      if(state.lastRange){
+        return readRange(state.lastRange.start, state.lastRange.end).then(events=>{
+          state.calendar.removeAllEvents(); state.calendar.addEventSource(events);
+          loading("Loaded "+events.length+" task(s)");
+        });
+      }
+    })
+    .catch(e=>{ console.error(e); alert(e.message||"Failed to save"); })
+    .finally(()=>busy(false));
 }
 function onUpdate(){
-  if(!state.selectedEvent){ alert("No task selected"); return; }
-  const payload = collectPayload();
-  payload[ATTR_MS_UPDATE_TS] = state.selectedEvent.extendedProps.__ts;
+  if(!state.selectedEvent){ alert("No task selected for update."); return; }
+  const base = state.clickedDate || new Date();
+  const payload = collectPayload(base);
   const err = validatePayload(payload); if(err){ alert(err); return; }
-  loading("Updating…");
-  writeAttributes(payload, {mode:"update"}).then(()=>{
-    overlay.style.display="none";
-    startAutoRefresh(payload[ATTR_MS_UPDATE_TS], found=>{
-      const p = found.extendedProps||{};
-      return String(p.MS_Title||"")===payload.MS_Title &&
-             String(p.MS_Status||"")===payload.MS_Status &&
-             String(p.MS_Machine||"")===payload.MS_Machine &&
-             Number(p.MS_Start||0)===Number(payload.MS_Start||0) &&
-             Number(p.MS_End||0)===Number(payload.MS_End||0) &&
-             String(p.MS_Task||"")===String(payload.MS_Task||"");
-    });
-  }).catch(err=>{ console.error(err); alert(err.message||"Failed to update"); });
+
+  loading("Updating…"); busy(true);
+  writeAttributes(payload)
+    .then(()=>{ overlay.style.display="none";
+      if(state.lastRange){
+        return readRange(state.lastRange.start, state.lastRange.end).then(events=>{
+          state.calendar.removeAllEvents(); state.calendar.addEventSource(events);
+          loading("Loaded "+events.length+" task(s)");
+        });
+      }
+    })
+    .catch(e=>{ console.error(e); alert(e.message||"Failed to update"); })
+    .finally(()=>busy(false));
 }
 
-/************ CALENDAR ************/
+/************ BOOT ************/
 function startCalendar(){
-  if(!window.FullCalendar){
+  if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
-      '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
+      '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>';
+    return;
   }
-  if(!JWT){
+  if (!JWT){
     document.getElementById('calendar').innerHTML =
-      '<div class="empty"><span class="err">Missing JWT (?token=…)</span></div>'; return;
+      '<div class="empty"><span class="err">Missing JWT (?token=…)</span></div>';
+    return;
   }
-  const calEl = $("#calendar");
+  var calEl = $("#calendar");
   state.calendar = new FullCalendar.Calendar(calEl, {
     initialView: "dayGridMonth",
     headerToolbar: { left: "prev,next today", center: "title", right: "" },
     height: "auto",
     eventContent: eventContent,
-    dateClick: (info)=>openModal(info.date),
-    eventClick: (info)=>showDetails(info.event),
-    datesSet: (info)=>{
+    dateClick: function(info){ openModalForDate(info.date); },
+    eventClick: function(info){ showDetails(info.event); },
+    datesSet: function(info){
       loading("Loading…");
       state.lastRange = { start: info.start, end: info.end };
-      readRange(info.start, info.end).then(events=>{
-        state.calendar.removeAllEvents(); state.calendar.addEventSource(events);
-        $("#details").className="empty"; $("#details").textContent="Select a task";
-        $("#sideActions").style.display="none";
-        loading("Loaded "+events.length+" task(s)");
-      }).catch(err=>{
-        console.error(err); loading(err.message||"Failed to load");
-        state.calendar.removeAllEvents();
-      });
+      readRange(info.start, info.end)
+        .then(function(events){
+          state.calendar.removeAllEvents();
+          state.calendar.addEventSource(events);
+          $("#details").className="empty"; $("#details").textContent="Select a task on the calendar";
+          $("#sideActions").style.display="none";
+          loading("Loaded "+events.length+" task(s)");
+        })
+        .catch(function(err){
+          console.error(err); loading(err.message || "Failed to load");
+          state.calendar.removeAllEvents();
+        });
     }
   });
   state.calendar.render();
+  loading("");
 }
-if (document.readyState==="complete" || document.readyState==="interactive") setTimeout(startCalendar,0);
+if (document.readyState === "complete" || document.readyState === "interactive") setTimeout(startCalendar,0);
 else document.addEventListener("DOMContentLoaded", startCalendar);
 </script>
 </body>
