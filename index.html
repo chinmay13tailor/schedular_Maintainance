@@ -155,22 +155,25 @@
   .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
 
   /* ===== Tips layout ===== */
-  .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px}
-  .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:420px}
-  .tips-head{padding:10px 12px;font-weight:900;text-align:center;border-bottom:1px solid var(--ring)}
-  .tips-h-blue{background:#eaf2ff}
-  .tips-h-yellow{background:#fff7cc}
-  .tips-h-red{background:#ffe4e6}
-  .tips-body{padding:10px;display:flex;flex-direction:column;gap:10px;overflow:auto}
-  .tip-card{border:1px solid var(--ring);border-radius:12px;padding:10px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;background:#fafafa}
-  .tip-icon{font-size:18px;line-height:1}
-  .tip-title{font-weight:800}
-  .tip-text{font-size:12px;color:#374151;margin-top:2px}
-  .tip-actions{display:flex;gap:8px}
-  .badge.sev-low{background:#e5f4ff;color:#0369a1}
-  .badge.sev-med{background:#fff0d1;color:#92400e}
-  .badge.sev-high{background:#ffe2e5;color:#991b1b}
-  @media (max-width: 1100px){ .tips-grid{grid-template-columns:1fr;} }
+  .tips-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:12px}
+  .tips-col{border-left:1px solid var(--ring);border-right:1px solid var(--ring);border-top:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
+  .tips-h{font-weight:900;padding:10px 12px;border-bottom:1px solid var(--ring)}
+  .tips-h.blue{background:#eff6ff}    /* Preventive */
+  .tips-h.yellow{background:#fffbeb}  /* Corrective */
+  .tips-h.red{background:#fef2f2}     /* Missed */
+
+  .tips-body{padding:12px;max-height:68vh;overflow:auto}
+  .tip-card{border:1px solid var(--ring);border-radius:12px;padding:10px;margin-bottom:10px;background:#fff}
+  .tip-card-h{display:flex;align-items:center;gap:10px}
+  .tip-card-h .ic{font-size:16px}
+  .tip-card-h .t1{font-weight:800}
+  .tip-card-h .t2{font-size:12px;color:#64748b}
+  .tip-card-b{margin-top:8px;color:#111827}
+  .tip-card-f{margin-top:10px;display:flex;gap:8px}
+  .sev{margin-left:auto;border-radius:999px;font-size:11px;padding:2px 8px;border:1px solid var(--ring)}
+  .sev.high{background:#fee2e2;color:#991b1b}
+  .sev.medium{background:#fef3c7;color:#92400e}
+  .sev.low{background:#e5e7eb;color:#374151}
 </style>
 </head>
 <body>
@@ -248,32 +251,29 @@
 
     <!-- Tips view -->
     <div id="viewTips" style="display:none;">
-      <div class="tips-grid">
-        <!-- Preventive -->
-        <section class="tips-col" id="tipsPrev">
-          <div class="tips-head tips-h-blue">Preventive Maintenance</div>
-          <div class="tips-body" id="tipsPrevBody">
-            <div class="empty">No tips right now. All good 👍</div>
+      <div class="tips-wrap">
+        <div class="tips-col">
+          <div class="tips-h blue">Preventive Maintenance</div>
+          <div class="tips-body" id="tipsPrevCol">
+            <div class="empty">No suggestions yet.</div>
           </div>
-        </section>
-        <!-- Corrective -->
-        <section class="tips-col" id="tipsCorr">
-          <div class="tips-head tips-h-yellow">Corrective Maintenance</div>
-          <div class="tips-body" id="tipsCorrBody">
+        </div>
+        <div class="tips-col">
+          <div class="tips-h yellow">Corrective Maintenance</div>
+          <div class="tips-body" id="tipsCorrCol">
             <div class="empty">No corrective suggestions.</div>
           </div>
-        </section>
-        <!-- Missed -->
-        <section class="tips-col" id="tipsMiss">
-          <div class="tips-head tips-h-red">Missed Maintenance</div>
-          <div class="tips-body" id="tipsMissBody">
+        </div>
+        <div class="tips-col">
+          <div class="tips-h red">Missed Maintenance</div>
+          <div class="tips-body" id="tipsMissCol">
             <div class="empty">No missed items detected.</div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
 
-    <!-- Missed placeholder -->
+    <!-- Missed placeholder (kept) -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -384,13 +384,12 @@ var ATTR_MS_SAVE    = "MS_Save_Button";
 var ATTR_MS_UPDATE  = "MS_Update_Buttton";
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Telemetry keys (schedule + runtime)
+// Telemetry keys
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
-var RUNTIME_BASE_KEY = "Currentday_Runtime"; // only for MC_01 right now
 
 /************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
@@ -421,8 +420,6 @@ function eventContent(arg){
 }
 function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999); }
-function startOfDay(d){ var x=new Date(d); x.setHours(0,0,0,0); return x; }
-function endOfDay(d){ var x=new Date(d); x.setHours(23,59,59,999); return x; }
 
 /************ STATE ************/
 var state = {
@@ -432,11 +429,11 @@ var state = {
   technicians: [],
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
-  listMonth: null,
+  listMonth: null,          // Date pointing to the visible month in List View
   lastListRange: null
 };
 
-/************ READ: Schedules ************/
+/************ READ ************/
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -486,39 +483,6 @@ function readRange(rangeStart, rangeEnd){
       out.sort((a,b)=>a.start-b.start);
       return out;
     });
-}
-
-/************ READ: Runtime (Currentday_Runtime for MC_01 only) ************/
-/* Return SUM OF MINUTES (per-day latest sample) between [start,end] */
-function fetchDailyRuntimeMinutesForKey(key, start, end){
-  if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
-  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
-          + "?keys=" + encodeURIComponent(key) +
-            "&startTs=" + start.getTime() +
-            "&endTs="   + end.getTime() +
-            "&limit=100000";
-  return fetch(url, { headers: { "X-Authorization":"Bearer "+JWT }})
-    .then(r=> r.ok ? r.json() : r.text().then(t=>{throw new Error("Runtime read failed: "+t);} ))
-    .then(obj=>{
-      var rows = (obj && obj[key]) || [];
-      if (!rows.length) return 0;
-      var dayMax = {};
-      rows.forEach(p=>{
-        var ts = Number(p.ts);
-        var d0 = new Date(ts); d0.setHours(0,0,0,0);
-        var keyDay = d0.getTime();
-        if (!dayMax[keyDay] || ts > dayMax[keyDay].ts) dayMax[keyDay] = { ts, val: Number(p.value)||0 };
-      });
-      var sumMin = 0;
-      Object.keys(dayMax).forEach(k=> sumMin += Number(dayMax[k].val)||0 );
-      return sumMin; // MINUTES
-    });
-}
-
-/* For now: only MC_01 supported; others return 0 */
-function fetchRuntimeMinutesForMachine(machine, start, end){
-  if (String(machine) !== "MC_01") return Promise.resolve(0);
-  return fetchDailyRuntimeMinutesForKey(RUNTIME_BASE_KEY, start, end);
 }
 
 /************ FILTERS ************/
@@ -571,7 +535,9 @@ function renderList(events){
       '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
       '<td>'+badge(p.MS_Status)+'</td>'+
       '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
-    tr.addEventListener("click", function(){ showDetails({ extendedProps: p }); });
+    tr.addEventListener("click", function(){
+      showDetails({ extendedProps: p });
+    });
     tbody.appendChild(tr);
   });
   $("#listCount").textContent = "Showing "+events.length+" task(s)";
@@ -591,6 +557,7 @@ function loadListMonth(baseDate){
 
   loading("Loading…");
   return readRange(s, e).then(function(events){
+    // keep filters/options in sync
     populateFilters(events);
     state.lastEventsFull = events.slice();
     var filtered = applyFilters(events);
@@ -599,114 +566,6 @@ function loadListMonth(baseDate){
   }).catch(function(err){
     console.error(err); loading(err.message||"Failed to load");
   });
-}
-
-/************ TIPS — UI helpers ************/
-function tipCard({icon,title,text,severity}){
-  var sev = severity||"low"; // low | med | high
-  var div = document.createElement("div");
-  div.className = "tip-card";
-  div.innerHTML = `
-    <div class="tip-icon">${icon||"⚙️"}</div>
-    <div>
-      <div class="tip-title">${escapeHtml(title||"Tip")}</div>
-      <div class="tip-text">${escapeHtml(text||"")}</div>
-    </div>
-    <div class="tip-actions">
-      <span class="badge sev-${sev}">${sev==="high"?"High":sev==="med"?"Medium":"Info"}</span>
-      <button class="btn ghost" type="button" onclick="showView('calendar')">Schedule</button>
-    </div>`;
-  return div;
-}
-
-/************ TIPS — Preventive (1) Runtime since last completed (MC_01 only) ************/
-async function tipsPreventiveRuntime(){
-  const today = new Date();
-  const from = new Date(today.getFullYear(), today.getMonth()-6, 1);
-  let events = await readRange(from, today);
-
-  // find last completed for MC_01
-  let lastEnd = null;
-  events.forEach(ev=>{
-    const p = ev.extendedProps||{};
-    if (p.MS_Machine!=="MC_01") return;
-    if (String(p.MS_Status).toLowerCase()!=="completed") return;
-    const endTs = Number(p.MS_End||p.MS_Start||0);
-    if (!endTs) return;
-    if (!lastEnd || endTs>lastEnd) lastEnd = endTs;
-  });
-  const cards = [];
-  if (!lastEnd) return cards; // no completed yet → no runtime tip
-
-  const start = startOfDay(new Date(lastEnd + 24*60*60*1000));
-  const end   = endOfDay(new Date());
-  try{
-    const minutes = await fetchRuntimeMinutesForMachine("MC_01", start, end);
-    const hours   = minutes / 60;
-    if (hours > 400){
-      const sev = hours >= 500 ? "high" : "med";
-      cards.push(tipCard({
-        icon:"⏱️",
-        title:`Runtime crossed ${Math.floor(hours)} hrs — MC_01`,
-        text:`MC_01 has accumulated ${Math.round(hours)} hrs since last completed maintenance on ${new Date(lastEnd).toLocaleDateString()}. Schedule preventive maintenance.`,
-        severity: sev
-      }));
-    }
-  }catch(e){ console.error("Runtime fetch failed for MC_01", e); }
-  return cards;
-}
-
-/************ TIPS — Preventive (2) Monthly count per machine (<2) ************/
-async function tipsPreventiveMonthlyCount(){
-  const now = new Date();
-  const s = startOfMonth(now);
-  const e = endOfMonth(now);
-  const events = await readRange(s, e);
-
-  const counts = {};
-  events.forEach(ev=>{
-    const p = ev.extendedProps||{};
-    if (!p.MS_Machine) return;
-    if (String(p.MS_Type) !== "Preventive") return;
-    counts[p.MS_Machine] = (counts[p.MS_Machine]||0) + 1;
-  });
-
-  const cards = [];
-  const allMachines = new Set(Object.keys(counts));
-  events.forEach(ev=>{ if (ev.extendedProps?.MS_Machine) allMachines.add(ev.extendedProps.MS_Machine); });
-
-  Array.from(allMachines).forEach(m=>{
-    const c = counts[m]||0;
-    if (c < 2){
-      cards.push(tipCard({
-        icon:"🧰",
-        title:`Low preventive coverage — ${m}`,
-        text:`You have scheduled only ${c} preventive maintenance${c===1?"":"s"} for ${m} this month. Minimum recommended is 2.`,
-        severity: c===0 ? "high" : "med"
-      }));
-    }
-  });
-  return cards;
-}
-
-/************ TIPS — entrypoint ************/
-async function renderTips(){
-  const prevBody = document.getElementById("tipsPrevBody");
-  prevBody.innerHTML = '<div class="empty">Analyzing preventive tips…</div>';
-
-  const [cardsRuntime, cardsCount] = await Promise.all([
-    tipsPreventiveRuntime(),
-    tipsPreventiveMonthlyCount()
-  ]);
-
-  const allCards = [...cardsRuntime, ...cardsCount];
-
-  prevBody.innerHTML = "";
-  if (!allCards.length){
-    prevBody.innerHTML = '<div class="empty">No preventive tips at the moment. All good 👍</div>';
-  } else {
-    allCards.forEach(card => prevBody.appendChild(card));
-  }
 }
 
 /************ VIEW SWITCH ************/
@@ -756,7 +615,9 @@ $("#listNext").addEventListener("click", function(){
   var d = state.listMonth ? new Date(state.listMonth) : new Date();
   d.setMonth(d.getMonth()+1); loadListMonth(d);
 });
-$("#listToday").addEventListener("click", function(){ loadListMonth(new Date()); });
+$("#listToday").addEventListener("click", function(){
+  loadListMonth(new Date());
+});
 
 /************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
 function refreshCalendar(){
@@ -768,8 +629,10 @@ function refreshCalendar(){
 $("#btnApplyFilters").addEventListener("click", function(){
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else {
+  } else if (state.view==="calendar"){
     refreshCalendar();
+  } else if (state.view==="tips"){
+    renderTips();
   }
 });
 $("#btnResetFilters").addEventListener("click", function(){
@@ -777,8 +640,10 @@ $("#btnResetFilters").addEventListener("click", function(){
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else {
+  } else if (state.view==="calendar"){
     refreshCalendar();
+  } else if (state.view==="tips"){
+    renderTips();
   }
 });
 
@@ -805,6 +670,10 @@ function startAutoRefresh(expectedTs, predicate){
           }
         })
         .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
+      return;
+    }
+    if (state.view==="tips"){
+      renderTips(); // keep tips fresh
       return;
     }
     if (!state.lastRange) return;
@@ -844,7 +713,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false;
+    body[ATTR_MS_SAVE] = false; // trigger create path
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -880,7 +749,9 @@ function showDetails(ev){
 
 /************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
-function busy(on){ ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; }); }
+function busy(on){
+  ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
+}
 function refreshTechChips(){
   var box=$("#techChips"); box.innerHTML="";
   state.technicians.forEach(function(name, idx){
@@ -898,7 +769,9 @@ function addOneTech(){
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
 
-function closeOverlay(){ overlay.style.display="none"; document.body.style.overflow=""; }
+function closeOverlay(){
+  overlay.style.display="none"; document.body.style.overflow="";
+}
 $("#closeModal").addEventListener("click", closeOverlay);
 
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
@@ -1178,6 +1051,198 @@ function generatePdf(ev){
     pagebreak:    { mode: ['css','legacy'] }
   };
   html2pdf().from(root).set(opt).save();
+}
+
+/* ======== TIPS LOGIC ======== */
+
+/* Helper: last completed maintenance timestamp for a machine */
+function getLastCompletedTsForMachine(machineId){
+  let latest = null;
+  for (const ev of state.lastEventsFull){
+    const p = ev.extendedProps || {};
+    if (String(p.MS_Machine)===String(machineId) && String(p.MS_Status).toLowerCase()==="completed"){
+      if (latest==null || Number(p.MS_End)>latest) latest = Number(p.MS_End);
+    }
+  }
+  return latest;
+}
+
+/* 1) DAILY last sample for Currentday_Runtime (minutes) */
+async function fetchLastRuntimeMinutesForDay(key, dayDate){
+  const startTs = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()).getTime();
+  const endTs   = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 23,59,59,999).getTime();
+  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID +
+    "/values/timeseries?keys=" + encodeURIComponent(key) +
+    "&startTs=" + startTs + "&endTs=" + endTs + "&limit=1&order=DESC";
+  const res = await fetch(url, { headers: { "X-Authorization": "Bearer " + JWT }});
+  if (!res.ok) throw new Error("Daily runtime read failed: " + (await res.text()));
+  const data = await res.json();
+  const arr = data[key] || [];
+  return arr.length ? (Number(arr[0].value)||0) : 0; // minutes
+}
+
+/* 2) Sum runtime since last completed for MC_01 only (as requested) */
+async function fetchRuntimeMinutesSinceLastMaintenance_MC01(){
+  const machineId = "MC_01";
+  const key = "Currentday_Runtime"; // minutes
+  const lastCompleted = getLastCompletedTsForMachine(machineId);
+  if (!lastCompleted){
+    return { minutes:0, hours:0, label:"No completed maintenance found" };
+  }
+  const start = new Date(lastCompleted);
+  const today = new Date();
+
+  let cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  let totalMin = 0;
+  while (cur <= today){
+    try{
+      totalMin += await fetchLastRuntimeMinutesForDay(key, cur);
+    }catch(e){
+      console.error("Runtime fetch error", cur, e);
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  const hours = totalMin/60;
+  return { minutes: totalMin, hours, label: `Runtime since last maintenance: ${hours.toFixed(1)} hrs` };
+}
+
+/* Preventive Coverage Tips (min 2 per month) */
+function buildPreventiveCoverageTips(events, monthStart, monthEnd){
+  // Count per machine (Preventive + planned/in-progress/completed)
+  const counts = {};
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    const within = (p.MS_Start>=monthStart.getTime() && p.MS_Start<=monthEnd.getTime());
+    if (!within) continue;
+    if (String(p.MS_Type)!=="Preventive") continue;
+
+    const st = String(p.MS_Status||"").toLowerCase();
+    if (["planned","in-progress","inprogress","completed"].includes(st)){
+      const m = String(p.MS_Machine||"");
+      if (!m) continue;
+      counts[m] = (counts[m]||0) + 1;
+    }
+  }
+
+  const cards = [];
+  Object.keys(counts).forEach(machine=>{
+    const n = counts[machine];
+    if (n<2){
+      const sev = n===0 ? "high" : "medium";
+      const card = document.createElement("div");
+      card.className = "tip-card";
+      card.innerHTML = `
+        <div class="tip-card-h">
+          <span class="ic">🧰</span>
+          <div class="t">
+            <div class="t1">Low preventive coverage — <strong>${escapeHtml(machine)}</strong></div>
+            <div class="t2 muted">This month preventive count: <strong>${n}</strong> (minimum recommended: 2)</div>
+          </div>
+          <span class="sev ${sev}">${sev==="high"?"High":"Medium"}</span>
+        </div>
+        <div class="tip-card-b">
+          You have scheduled only <strong>${n}</strong> preventive maintenance${n!==1?"s":""} for <strong>${escapeHtml(machine)}</strong> this month.
+          <br><strong>Tip:</strong> Add more preventive schedules to meet recommended frequency.
+        </div>
+        <div class="tip-card-f">
+          <button class="btn ghost">Schedule</button>
+        </div>
+      `;
+      card.querySelector(".btn").addEventListener("click", ()=>{
+        openModalForDate(new Date());
+        $("#fType").value="Preventive";
+        $("#fMachine").value=machine;
+      });
+      cards.push(card);
+    }
+  });
+  return cards;
+}
+
+/* Preventive Runtime Tip for MC_01 ( > 400 hrs ) */
+async function buildPreventiveRuntimeTip(){
+  const info = await fetchRuntimeMinutesSinceLastMaintenance_MC01();
+  const over = info.hours > 400;
+
+  const card = document.createElement("div");
+  card.className = "tip-card";
+  card.innerHTML = `
+    <div class="tip-card-h">
+      <span class="ic">⏱️</span>
+      <div class="t">
+        <div class="t1">Runtime monitor — <strong>MC_01</strong></div>
+        <div class="t2 muted">${escapeHtml(info.label)}</div>
+      </div>
+      <span class="sev ${over?'high':'low'}">${over?'High':'Info'}</span>
+    </div>
+    <div class="tip-card-b">
+      ${over
+        ? `Machine <strong>MC_01</strong> has run <strong>${info.hours.toFixed(1)} hrs</strong> since last completed maintenance.<br>
+           <strong>Tip:</strong> Crossed 400 hrs — please schedule preventive maintenance.`
+        : `Machine <strong>MC_01</strong> has run <strong>${info.hours.toFixed(1)} hrs</strong> since last maintenance.<br>
+           <strong>Status:</strong> Below 400 hrs.`}
+    </div>
+    <div class="tip-card-f">
+      <button class="btn ghost">Schedule</button>
+    </div>
+  `;
+  card.querySelector(".btn").addEventListener("click", ()=>{
+    openModalForDate(new Date());
+    $("#fType").value="Preventive";
+    $("#fMachine").value="MC_01";
+  });
+  return card;
+}
+
+/* Render Tips (current month) */
+async function renderTips(){
+  loading("Analyzing tips…");
+
+  const now = new Date();
+  const s = startOfMonth(now), e = endOfMonth(now);
+
+  try{
+    const events = await readRange(s, e);
+    state.lastEventsFull = events.slice(); // keep consistency
+    populateFilters(events);
+
+    // prepare columns
+    const prevCol = $("#tipsPrevCol"), corrCol = $("#tipsCorrCol"), missCol = $("#tipsMissCol");
+    [prevCol, corrCol, missCol].forEach(col=>{ col.innerHTML=""; });
+
+    // Preventive coverage cards
+    const coverCards = buildPreventiveCoverageTips(events, s, e);
+    if (coverCards.length){
+      coverCards.forEach(c=>prevCol.appendChild(c));
+    }
+
+    // Preventive runtime (MC_01 only)
+    try{
+      const runtimeCard = await buildPreventiveRuntimeTip();
+      prevCol.appendChild(runtimeCard);
+    }catch(err){
+      console.error("Runtime card error", err);
+    }
+
+    // fallback empties
+    if (!prevCol.children.length){
+      prevCol.innerHTML = '<div class="empty">No preventive suggestions.</div>';
+    }
+    if (!corrCol.children.length){
+      corrCol.innerHTML = '<div class="empty">No corrective suggestions.</div>';
+    }
+    if (!missCol.children.length){
+      missCol.innerHTML = '<div class="empty">No missed items detected.</div>';
+    }
+
+    loading("Tips ready");
+  }catch(err){
+    console.error(err);
+    $("#tipsPrevCol").innerHTML = '<div class="empty">Failed to load tips.</div>';
+    $("#tipsCorrCol").innerHTML = '<div class="empty">—</div>';
+    $("#tipsMissCol").innerHTML = '<div class="empty">—</div>';
+    loading(err.message||"Failed to load tips");
+  }
 }
 
 /************ BOOT ************/
