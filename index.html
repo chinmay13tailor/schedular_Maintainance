@@ -108,6 +108,9 @@
 
   /* ===== List tables ===== */
   .toolbar-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--ring)}
+  /* List view toolbar ko calendar ke jaisa padding/spacing de */
+#viewList .fc .fc-toolbar{ padding:10px; }
+#viewList .fc-button{ background:#fff; border:1px solid var(--ring); color:#0f172a; border-radius:10px; padding:6px 10px; }
   .table-wrap{overflow:auto;max-height:68vh}
   table{width:100%;border-collapse:collapse;font-size:13px}
   thead th{position:sticky;top:0;background:#f8fafc;z-index:1}
@@ -201,32 +204,47 @@
     <div id="viewCalendar"><div id="calendar"></div></div>
 
     <!-- List view -->
-    <div id="viewList" style="display:none;">
-      <div class="toolbar-row" id="listToolbar" style="gap:12px;">
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn" id="listPrev" type="button">‹</button>
-          <button class="btn" id="listToday" type="button">today</button>
-          <button class="btn" id="listNext" type="button">›</button>
+<div id="viewList" style="display:none;">
+  <div class="fc fc-media-screen">
+    <div class="fc-toolbar fc-header-toolbar" id="listToolbar">
+      <!-- LEFT: prev / today / next -->
+      <div class="fc-toolbar-chunk">
+        <div class="fc-button-group">
+          <button class="fc-button fc-button-primary" id="listPrev" type="button" aria-label="prev">‹</button>
+          <button class="fc-button fc-button-primary" id="listToday" type="button">today</button>
+          <button class="fc-button fc-button-primary" id="listNext" type="button" aria-label="next">›</button>
         </div>
-        <strong id="listTitle" style="font-size:15px;">—</strong>
+      </div>
+
+      <!-- CENTER: month title -->
+      <div class="fc-toolbar-chunk">
+        <h2 id="listTitle" class="fc-toolbar-title">—</h2>
+      </div>
+
+      <!-- RIGHT: legends + count -->
+      <div class="fc-toolbar-chunk" style="gap:16px; display:flex; align-items:center;">
         <div class="fc-toolbar-chunk legends">
           <span><span class="legend-box legend-planned"></span> Planned</span>
           <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
           <span><span class="legend-box legend-completed"></span> Completed</span>
           <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
           <span><span class="legend-box legend-postponed"></span> Postponed</span>
-          <span class="muted" id="listCount" style="margin-left:14px"></span>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table id="listTable">
-          <thead><tr>
-            <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
+        <span class="muted" id="listCount"></span>
       </div>
     </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="listTable">
+      <thead><tr>
+        <th>Date</th><th>Start</th><th>Machine</th><th>Title</th><th>Type</th><th>Techs</th><th>Status</th><th>Priority</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
 
     <!-- Tips placeholder -->
     <div id="viewTips" style="display:none;padding:18px;">
