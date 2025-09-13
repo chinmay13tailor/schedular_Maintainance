@@ -155,22 +155,14 @@
   .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
 
   /* ===== Tips layout ===== */
-  .tips-grid{
-    display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;
-  }
-  .tips-col{
-    border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:420px;
-  }
-  .tips-head{
-    padding:10px 12px;font-weight:900;text-align:center;border-bottom:1px solid var(--ring)
-  }
+  .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px}
+  .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:420px}
+  .tips-head{padding:10px 12px;font-weight:900;text-align:center;border-bottom:1px solid var(--ring)}
   .tips-h-blue{background:#eaf2ff}
   .tips-h-yellow{background:#fff7cc}
   .tips-h-red{background:#ffe4e6}
   .tips-body{padding:10px;display:flex;flex-direction:column;gap:10px;overflow:auto}
-  .tip-card{
-    border:1px solid var(--ring);border-radius:12px;padding:10px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;background:#fafafa
-  }
+  .tip-card{border:1px solid var(--ring);border-radius:12px;padding:10px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;background:#fafafa}
   .tip-icon{font-size:18px;line-height:1}
   .tip-title{font-weight:800}
   .tip-text{font-size:12px;color:#374151;margin-top:2px}
@@ -178,9 +170,7 @@
   .badge.sev-low{background:#e5f4ff;color:#0369a1}
   .badge.sev-med{background:#fff0d1;color:#92400e}
   .badge.sev-high{background:#ffe2e5;color:#991b1b}
-  @media (max-width: 1100px){
-    .tips-grid{grid-template-columns:1fr; }
-  }
+  @media (max-width: 1100px){ .tips-grid{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
@@ -223,7 +213,7 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main area -->
+  <!-- Main area: Calendar/List/Tips/Missed -->
   <div id="mainCard" class="card">
     <!-- Calendar view -->
     <div id="viewCalendar"><div id="calendar"></div></div>
@@ -283,7 +273,7 @@
       </div>
     </div>
 
-    <!-- Missed placeholder (kept for future) -->
+    <!-- Missed placeholder -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -394,12 +384,13 @@ var ATTR_MS_SAVE    = "MS_Save_Button";
 var ATTR_MS_UPDATE  = "MS_Update_Buttton";
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Telemetry keys
+// Telemetry keys (schedule + runtime)
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
+var RUNTIME_BASE_KEY = "Currentday_Runtime"; // only for MC_01 right now
 
 /************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
@@ -430,6 +421,8 @@ function eventContent(arg){
 }
 function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999); }
+function startOfDay(d){ var x=new Date(d); x.setHours(0,0,0,0); return x; }
+function endOfDay(d){ var x=new Date(d); x.setHours(23,59,59,999); return x; }
 
 /************ STATE ************/
 var state = {
@@ -443,7 +436,7 @@ var state = {
   lastListRange: null
 };
 
-/************ READ ************/
+/************ READ: Schedules ************/
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -493,6 +486,39 @@ function readRange(rangeStart, rangeEnd){
       out.sort((a,b)=>a.start-b.start);
       return out;
     });
+}
+
+/************ READ: Runtime (Currentday_Runtime for MC_01 only) ************/
+/* Return SUM OF MINUTES (per-day latest sample) between [start,end] */
+function fetchDailyRuntimeMinutesForKey(key, start, end){
+  if(!JWT) return Promise.reject(new Error("Missing JWT (?token=)"));
+  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
+          + "?keys=" + encodeURIComponent(key) +
+            "&startTs=" + start.getTime() +
+            "&endTs="   + end.getTime() +
+            "&limit=100000";
+  return fetch(url, { headers: { "X-Authorization":"Bearer "+JWT }})
+    .then(r=> r.ok ? r.json() : r.text().then(t=>{throw new Error("Runtime read failed: "+t);} ))
+    .then(obj=>{
+      var rows = (obj && obj[key]) || [];
+      if (!rows.length) return 0;
+      var dayMax = {};
+      rows.forEach(p=>{
+        var ts = Number(p.ts);
+        var d0 = new Date(ts); d0.setHours(0,0,0,0);
+        var keyDay = d0.getTime();
+        if (!dayMax[keyDay] || ts > dayMax[keyDay].ts) dayMax[keyDay] = { ts, val: Number(p.value)||0 };
+      });
+      var sumMin = 0;
+      Object.keys(dayMax).forEach(k=> sumMin += Number(dayMax[k].val)||0 );
+      return sumMin; // MINUTES
+    });
+}
+
+/* For now: only MC_01 supported; others return 0 */
+function fetchRuntimeMinutesForMachine(machine, start, end){
+  if (String(machine) !== "MC_01") return Promise.resolve(0);
+  return fetchDailyRuntimeMinutesForKey(RUNTIME_BASE_KEY, start, end);
 }
 
 /************ FILTERS ************/
@@ -545,9 +571,7 @@ function renderList(events){
       '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
       '<td>'+badge(p.MS_Status)+'</td>'+
       '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
-    tr.addEventListener("click", function(){
-      showDetails({ extendedProps: p });
-    });
+    tr.addEventListener("click", function(){ showDetails({ extendedProps: p }); });
     tbody.appendChild(tr);
   });
   $("#listCount").textContent = "Showing "+events.length+" task(s)";
@@ -577,7 +601,7 @@ function loadListMonth(baseDate){
   });
 }
 
-/************ TIPS RENDER (layout only; mock data for now) ************/
+/************ TIPS — UI helpers ************/
 function tipCard({icon,title,text,severity}){
   var sev = severity||"low"; // low | med | high
   var div = document.createElement("div");
@@ -594,23 +618,95 @@ function tipCard({icon,title,text,severity}){
     </div>`;
   return div;
 }
-function renderTipsMock(){
-  // Preventive – sample tips based on your example text
-  var prev = $("#tipsPrevBody"); prev.innerHTML = "";
-  prev.appendChild(tipCard({
-    icon:"🛠️",
-    title:"Machine MC_02 preventive frequency low",
-    text:"You have scheduled only 1 maintenance this month for MC_02. Minimum recommended is 2.",
-    severity:"med"
-  }));
-  prev.appendChild(tipCard({
-    icon:"⏱️",
-    title:"Runtime crossed 400 hrs (MC_02)",
-    text:"Machine MC_02 has run more than 400 hrs since last maintenance. Please schedule preventive maintenance.",
-    severity:"high"
-  }));
 
-  // Corrective / Missed empty states stay if nothing to show
+/************ TIPS — Preventive (1) Runtime since last completed (MC_01 only) ************/
+async function tipsPreventiveRuntime(){
+  const today = new Date();
+  const from = new Date(today.getFullYear(), today.getMonth()-6, 1);
+  let events = await readRange(from, today);
+
+  // find last completed for MC_01
+  let lastEnd = null;
+  events.forEach(ev=>{
+    const p = ev.extendedProps||{};
+    if (p.MS_Machine!=="MC_01") return;
+    if (String(p.MS_Status).toLowerCase()!=="completed") return;
+    const endTs = Number(p.MS_End||p.MS_Start||0);
+    if (!endTs) return;
+    if (!lastEnd || endTs>lastEnd) lastEnd = endTs;
+  });
+  const cards = [];
+  if (!lastEnd) return cards; // no completed yet → no runtime tip
+
+  const start = startOfDay(new Date(lastEnd + 24*60*60*1000));
+  const end   = endOfDay(new Date());
+  try{
+    const minutes = await fetchRuntimeMinutesForMachine("MC_01", start, end);
+    const hours   = minutes / 60;
+    if (hours > 400){
+      const sev = hours >= 500 ? "high" : "med";
+      cards.push(tipCard({
+        icon:"⏱️",
+        title:`Runtime crossed ${Math.floor(hours)} hrs — MC_01`,
+        text:`MC_01 has accumulated ${Math.round(hours)} hrs since last completed maintenance on ${new Date(lastEnd).toLocaleDateString()}. Schedule preventive maintenance.`,
+        severity: sev
+      }));
+    }
+  }catch(e){ console.error("Runtime fetch failed for MC_01", e); }
+  return cards;
+}
+
+/************ TIPS — Preventive (2) Monthly count per machine (<2) ************/
+async function tipsPreventiveMonthlyCount(){
+  const now = new Date();
+  const s = startOfMonth(now);
+  const e = endOfMonth(now);
+  const events = await readRange(s, e);
+
+  const counts = {};
+  events.forEach(ev=>{
+    const p = ev.extendedProps||{};
+    if (!p.MS_Machine) return;
+    if (String(p.MS_Type) !== "Preventive") return;
+    counts[p.MS_Machine] = (counts[p.MS_Machine]||0) + 1;
+  });
+
+  const cards = [];
+  const allMachines = new Set(Object.keys(counts));
+  events.forEach(ev=>{ if (ev.extendedProps?.MS_Machine) allMachines.add(ev.extendedProps.MS_Machine); });
+
+  Array.from(allMachines).forEach(m=>{
+    const c = counts[m]||0;
+    if (c < 2){
+      cards.push(tipCard({
+        icon:"🧰",
+        title:`Low preventive coverage — ${m}`,
+        text:`You have scheduled only ${c} preventive maintenance${c===1?"":"s"} for ${m} this month. Minimum recommended is 2.`,
+        severity: c===0 ? "high" : "med"
+      }));
+    }
+  });
+  return cards;
+}
+
+/************ TIPS — entrypoint ************/
+async function renderTips(){
+  const prevBody = document.getElementById("tipsPrevBody");
+  prevBody.innerHTML = '<div class="empty">Analyzing preventive tips…</div>';
+
+  const [cardsRuntime, cardsCount] = await Promise.all([
+    tipsPreventiveRuntime(),
+    tipsPreventiveMonthlyCount()
+  ]);
+
+  const allCards = [...cardsRuntime, ...cardsCount];
+
+  prevBody.innerHTML = "";
+  if (!allCards.length){
+    prevBody.innerHTML = '<div class="empty">No preventive tips at the moment. All good 👍</div>';
+  } else {
+    allCards.forEach(card => prevBody.appendChild(card));
+  }
 }
 
 /************ VIEW SWITCH ************/
@@ -641,7 +737,7 @@ function showView(name){
   } else if (name==="calendar"){
     refreshCalendar();
   } else if (name==="tips"){
-    renderTipsMock(); // layout demo; later we’ll plug analytics
+    renderTips();
   } else {
     loading("");
   }
@@ -660,9 +756,7 @@ $("#listNext").addEventListener("click", function(){
   var d = state.listMonth ? new Date(state.listMonth) : new Date();
   d.setMonth(d.getMonth()+1); loadListMonth(d);
 });
-$("#listToday").addEventListener("click", function(){
-  loadListMonth(new Date());
-});
+$("#listToday").addEventListener("click", function(){ loadListMonth(new Date()); });
 
 /************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
 function refreshCalendar(){
@@ -786,9 +880,7 @@ function showDetails(ev){
 
 /************ MODAL + TECH CHIPS ************/
 var overlay = $("#overlay");
-function busy(on){
-  ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
-}
+function busy(on){ ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; }); }
 function refreshTechChips(){
   var box=$("#techChips"); box.innerHTML="";
   state.technicians.forEach(function(name, idx){
@@ -806,9 +898,7 @@ function addOneTech(){
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
 
-function closeOverlay(){
-  overlay.style.display="none"; document.body.style.overflow="";
-}
+function closeOverlay(){ overlay.style.display="none"; document.body.style.overflow=""; }
 $("#closeModal").addEventListener("click", closeOverlay);
 
 $("#btnNew").addEventListener("click", function(){ openModalForDate(new Date()); });
@@ -1128,7 +1218,7 @@ function startCalendar(){
   });
   state.calendar.render();
 
-  // Legends on toolbar right
+  // Legends on toolbar right (calendar only)
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
