@@ -116,6 +116,19 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
   .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
   .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
+  .chip-note{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--ring);border-radius:999px;font-size:11px;background:#f8fafc;color:#475569}
+
+  /* ===== Tips layout ===== */
+  .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px}
+  .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
+  .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring)}
+  .tips-col h4 span{font-weight:700;color:#64748b;font-size:12px;margin-left:8px}
+  .tip-card{border-bottom:1px solid var(--ring);padding:12px}
+  .tip-card:last-child{border-bottom:0}
+  .tip-title{font-weight:900;margin-bottom:6px}
+  .tip-body{color:#334155;white-space:pre-line}
+  .tip-actions{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tip-empty{padding:14px;color:#64748b;text-align:center;background:#f8fafc;margin:10px;border-radius:10px}
 
   /* ===== PDF styles ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
@@ -153,27 +166,6 @@
   .modal .row-full{grid-column:1 / -1}
   .modal label{display:block;font-size:12px;color:#475569;font-weight:800;margin:0 0 6px}
   .modal footer{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--ring);padding:10px 14px;border-radius:0 0 14px 14px}
-
-  /* ===== Tips layout ===== */
-  .tips-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:12px}
-  .tips-col{border-left:1px solid var(--ring);border-right:1px solid var(--ring);border-top:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
-  .tips-h{font-weight:900;padding:10px 12px;border-bottom:1px solid var(--ring)}
-  .tips-h.blue{background:#eff6ff}    /* Preventive */
-  .tips-h.yellow{background:#fffbeb}  /* Corrective */
-  .tips-h.red{background:#fef2f2}     /* Missed */
-
-  .tips-body{padding:12px;max-height:68vh;overflow:auto}
-  .tip-card{border:1px solid var(--ring);border-radius:12px;padding:10px;margin-bottom:10px;background:#fff}
-  .tip-card-h{display:flex;align-items:center;gap:10px}
-  .tip-card-h .ic{font-size:16px}
-  .tip-card-h .t1{font-weight:800}
-  .tip-card-h .t2{font-size:12px;color:#64748b}
-  .tip-card-b{margin-top:8px;color:#111827}
-  .tip-card-f{margin-top:10px;display:flex;gap:8px}
-  .sev{margin-left:auto;border-radius:999px;font-size:11px;padding:2px 8px;border:1px solid var(--ring)}
-  .sev.high{background:#fee2e2;color:#991b1b}
-  .sev.medium{background:#fef3c7;color:#92400e}
-  .sev.low{background:#e5e7eb;color:#374151}
 </style>
 </head>
 <body>
@@ -251,25 +243,19 @@
 
     <!-- Tips view -->
     <div id="viewTips" style="display:none;">
-      <div class="tips-wrap">
-        <div class="tips-col">
-          <div class="tips-h blue">Preventive Maintenance</div>
-          <div class="tips-body" id="tipsPrevCol">
-            <div class="empty">No suggestions yet.</div>
-          </div>
-        </div>
-        <div class="tips-col">
-          <div class="tips-h yellow">Corrective Maintenance</div>
-          <div class="tips-body" id="tipsCorrCol">
-            <div class="empty">No corrective suggestions.</div>
-          </div>
-        </div>
-        <div class="tips-col">
-          <div class="tips-h red">Missed Maintenance</div>
-          <div class="tips-body" id="tipsMissCol">
-            <div class="empty">No missed items detected.</div>
-          </div>
-        </div>
+      <div class="tips-grid">
+        <section class="tips-col" id="tipsPrev">
+          <h4>Preventive Maintenance <span id="tipsPrevCount"></span></h4>
+          <div id="tipsPrevBody"></div>
+        </section>
+        <section class="tips-col" id="tipsCorr">
+          <h4>Corrective Maintenance <span id="tipsCorrCount"></span></h4>
+          <div id="tipsCorrBody"></div>
+        </section>
+        <section class="tips-col" id="tipsMiss">
+          <h4>Missed Maintenance <span id="tipsMissCount"></span></h4>
+          <div id="tipsMissBody"></div>
+        </section>
       </div>
     </div>
 
@@ -420,6 +406,11 @@ function eventContent(arg){
 }
 function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999); }
+function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0); }
+function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999); }
+
+/* >>> Case-insensitive machine normalization <<< */
+function normMachine(s){ return String(s||"").trim().toUpperCase(); }
 
 /************ STATE ************/
 var state = {
@@ -434,6 +425,7 @@ var state = {
 };
 
 /************ READ ************/
+/* Read events (unchanged) */
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -506,9 +498,10 @@ function populateFilters(events){
 function applyFilters(events){
   var ma=$("#filtMa").value, ty=$("#filtTy").value, st=$("#filtSt").value, tech=$("#filtTech").value;
   state.filters = { ma, ty, st, tech };
+  var maNorm = normMachine(ma);
   return events.filter(ev=>{
     var p = ev.extendedProps||{};
-    var okMa = (ma==="__ALL__" || String(p.MS_Machine)===ma);
+    var okMa = (ma==="__ALL__" || normMachine(p.MS_Machine)===maNorm);
     var okTy = (ty==="__ALL__" || String(p.MS_Type)===ty);
     var okSt = (st==="__ALL__" || String(p.MS_Status)===st);
     var okTe = (tech==="__ALL__" || (p.MS_Technicians||"").split(",").map(s=>s.trim()).includes(tech));
@@ -557,7 +550,6 @@ function loadListMonth(baseDate){
 
   loading("Loading…");
   return readRange(s, e).then(function(events){
-    // keep filters/options in sync
     populateFilters(events);
     state.lastEventsFull = events.slice();
     var filtered = applyFilters(events);
@@ -596,7 +588,7 @@ function showView(name){
   } else if (name==="calendar"){
     refreshCalendar();
   } else if (name==="tips"){
-    renderTips();
+    renderTips().catch(e=>console.error(e));
   } else {
     loading("");
   }
@@ -629,10 +621,10 @@ function refreshCalendar(){
 $("#btnApplyFilters").addEventListener("click", function(){
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else if (state.view==="calendar"){
-    refreshCalendar();
   } else if (state.view==="tips"){
     renderTips();
+  } else {
+    refreshCalendar();
   }
 });
 $("#btnResetFilters").addEventListener("click", function(){
@@ -640,10 +632,10 @@ $("#btnResetFilters").addEventListener("click", function(){
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else if (state.view==="calendar"){
-    refreshCalendar();
   } else if (state.view==="tips"){
     renderTips();
+  } else {
+    refreshCalendar();
   }
 });
 
@@ -673,8 +665,7 @@ function startAutoRefresh(expectedTs, predicate){
       return;
     }
     if (state.view==="tips"){
-      renderTips(); // keep tips fresh
-      return;
+      renderTips(); return;
     }
     if (!state.lastRange) return;
     readRange(state.lastRange.start, state.lastRange.end)
@@ -1053,195 +1044,196 @@ function generatePdf(ev){
   html2pdf().from(root).set(opt).save();
 }
 
-/* ======== TIPS LOGIC ======== */
-
-/* Helper: last completed maintenance timestamp for a machine */
-function getLastCompletedTsForMachine(machineId){
+/************ TIPS ENGINE ************/
+/* Utility: latest completed maintenance timestamp for a machine (any type) */
+function latestCompletedTsForMachine(events, mNorm){
   let latest = null;
-  for (const ev of state.lastEventsFull){
-    const p = ev.extendedProps || {};
-    if (String(p.MS_Machine)===String(machineId) && String(p.MS_Status).toLowerCase()==="completed"){
-      if (latest==null || Number(p.MS_End)>latest) latest = Number(p.MS_End);
-    }
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    if (normMachine(p.MS_Machine)!==mNorm) continue;
+    const st = String(p.MS_Status||"").toLowerCase();
+    if (st!=="completed") continue;
+    if (latest==null || Number(p.MS_End)>latest){ latest = Number(p.MS_End); }
   }
   return latest;
 }
 
-/* 1) DAILY last sample for Currentday_Runtime (minutes) */
-async function fetchLastRuntimeMinutesForDay(key, dayDate){
-  const startTs = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()).getTime();
-  const endTs   = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 23,59,59,999).getTime();
-  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID +
-    "/values/timeseries?keys=" + encodeURIComponent(key) +
-    "&startTs=" + startTs + "&endTs=" + endTs + "&limit=1&order=DESC";
-  const res = await fetch(url, { headers: { "X-Authorization": "Bearer " + JWT }});
-  if (!res.ok) throw new Error("Daily runtime read failed: " + (await res.text()));
-  const data = await res.json();
-  const arr = data[key] || [];
-  return arr.length ? (Number(arr[0].value)||0) : 0; // minutes
+/* Fetch last value of an incremental "Currentday_Runtime" key for a single day (minutes) */
+function fetchDailyRuntimeMinutesForKey(dayDate, key){
+  const s = startOfDay(dayDate).getTime();
+  const e = endOfDay(dayDate).getTime();
+  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
+            + "?keys="+encodeURIComponent(key)
+            + "&startTs="+s+"&endTs="+e+"&limit=500";
+  return fetch(url, { headers:{ "X-Authorization":"Bearer "+JWT }})
+    .then(res=> res.ok ? res.json() : res.text().then(t=>{ throw new Error("Runtime read failed: "+t); }))
+    .then(obj=>{
+      const arr = (obj && obj[key]) || [];
+      if (!arr.length) return 0;
+      // last point's value is the total minutes for that day
+      return Number(arr[arr.length-1].value)||0;
+    });
 }
 
-/* 2) Sum runtime since last completed for MC_01 only (as requested) */
-async function fetchRuntimeMinutesSinceLastMaintenance_MC01(){
-  const machineId = "MC_01";
-  const key = "Currentday_Runtime"; // minutes
-  const lastCompleted = getLastCompletedTsForMachine(machineId);
-  if (!lastCompleted){
-    return { minutes:0, hours:0, label:"No completed maintenance found" };
-  }
-  const start = new Date(lastCompleted);
-  const today = new Date();
+/* Sum runtime minutes between [fromTs, now] (inclusive) for MC_01 (key: Currentday_Runtime) */
+async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
+  // Only MC_01 wired for now as per requirement
+  if (mNorm!=="MC_01") return 0;
+  const key = "Currentday_Runtime";
 
-  let cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  let totalMin = 0;
-  while (cur <= today){
+  const start = new Date(fromTs || Date.now());
+  start.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  let total = 0;
+  for (let d = new Date(start); d <= today; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1)){
     try{
-      totalMin += await fetchLastRuntimeMinutesForDay(key, cur);
+      total += await fetchDailyRuntimeMinutesForKey(d, key);
     }catch(e){
-      console.error("Runtime fetch error", cur, e);
+      console.warn("Runtime fetch failed for", mNorm, e);
     }
-    cur.setDate(cur.getDate()+1);
   }
-  const hours = totalMin/60;
-  return { minutes: totalMin, hours, label: `Runtime since last maintenance: ${hours.toFixed(1)} hrs` };
+  return total; // minutes
 }
 
-/* Preventive Coverage Tips (min 2 per month) */
-function buildPreventiveCoverageTips(events, monthStart, monthEnd){
-  // Count per machine (Preventive + planned/in-progress/completed)
-  const counts = {};
-  for (const ev of events){
-    const p = ev.extendedProps||{};
-    const within = (p.MS_Start>=monthStart.getTime() && p.MS_Start<=monthEnd.getTime());
-    if (!within) continue;
-    if (String(p.MS_Type)!=="Preventive") continue;
+/* >>> Case-insensitive preventive coverage tips (current month, planned+completed) */
+async function tipsPreventiveCoverage(monthStartDate){
+  const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
+  const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
 
+  const events = await readRange(s,e);
+
+  const byMachine = new Map(); // key = NORM
+  for (const ev of events){
+    const p = ev.extendedProps || {};
+    const mNorm = normMachine(p.MS_Machine);
+    if (!mNorm) continue;
+    if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, countPrev: 0 });
+
+    const isPreventive = String(p.MS_Type||"").toLowerCase()==="preventive";
     const st = String(p.MS_Status||"").toLowerCase();
-    if (["planned","in-progress","inprogress","completed"].includes(st)){
-      const m = String(p.MS_Machine||"");
-      if (!m) continue;
-      counts[m] = (counts[m]||0) + 1;
-    }
+    const ok = (st==="planned" || st==="completed");
+    if (isPreventive && ok){ byMachine.get(mNorm).countPrev += 1; }
+
+    byMachine.get(mNorm).pretty = p.MS_Machine || byMachine.get(mNorm).pretty;
   }
 
+  const MIN_PREV = 2;
   const cards = [];
-  Object.keys(counts).forEach(machine=>{
-    const n = counts[machine];
-    if (n<2){
-      const sev = n===0 ? "high" : "medium";
-      const card = document.createElement("div");
-      card.className = "tip-card";
-      card.innerHTML = `
-        <div class="tip-card-h">
-          <span class="ic">🧰</span>
-          <div class="t">
-            <div class="t1">Low preventive coverage — <strong>${escapeHtml(machine)}</strong></div>
-            <div class="t2 muted">This month preventive count: <strong>${n}</strong> (minimum recommended: 2)</div>
-          </div>
-          <span class="sev ${sev}">${sev==="high"?"High":"Medium"}</span>
-        </div>
-        <div class="tip-card-b">
-          You have scheduled only <strong>${n}</strong> preventive maintenance${n!==1?"s":""} for <strong>${escapeHtml(machine)}</strong> this month.
-          <br><strong>Tip:</strong> Add more preventive schedules to meet recommended frequency.
-        </div>
-        <div class="tip-card-f">
-          <button class="btn ghost">Schedule</button>
-        </div>
-      `;
-      card.querySelector(".btn").addEventListener("click", ()=>{
-        openModalForDate(new Date());
-        $("#fType").value="Preventive";
-        $("#fMachine").value=machine;
+  for (const [mNorm, info] of byMachine){
+    if (info.countPrev < MIN_PREV){
+      cards.push({
+        severity: info.countPrev===0 ? "High" : "Medium",
+        title: `Low preventive coverage — ${info.pretty}`,
+        subtitle: `This month preventive count: ${info.countPrev} (minimum recommended: ${MIN_PREV})`,
+        body: `You have scheduled only ${info.countPrev||0} preventive maintenance for ${info.pretty} this month.\nTip: Add more preventive schedules to meet recommended frequency.`,
+        cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
       });
-      cards.push(card);
     }
-  });
+  }
   return cards;
 }
 
-/* Preventive Runtime Tip for MC_01 ( > 400 hrs ) */
-async function buildPreventiveRuntimeTip(){
-  const info = await fetchRuntimeMinutesSinceLastMaintenance_MC01();
-  const over = info.hours > 400;
+/* Runtime tip (threshold 400 hours) only for MC_01 */
+async function tipsPreventiveRuntime(){
+  // Look back up to 120 days to find last completed
+  const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
+  const events = await readRange(lookBackStart, new Date());
 
-  const card = document.createElement("div");
-  card.className = "tip-card";
-  card.innerHTML = `
-    <div class="tip-card-h">
-      <span class="ic">⏱️</span>
-      <div class="t">
-        <div class="t1">Runtime monitor — <strong>MC_01</strong></div>
-        <div class="t2 muted">${escapeHtml(info.label)}</div>
-      </div>
-      <span class="sev ${over?'high':'low'}">${over?'High':'Info'}</span>
-    </div>
-    <div class="tip-card-b">
-      ${over
-        ? `Machine <strong>MC_01</strong> has run <strong>${info.hours.toFixed(1)} hrs</strong> since last completed maintenance.<br>
-           <strong>Tip:</strong> Crossed 400 hrs — please schedule preventive maintenance.`
-        : `Machine <strong>MC_01</strong> has run <strong>${info.hours.toFixed(1)} hrs</strong> since last maintenance.<br>
-           <strong>Status:</strong> Below 400 hrs.`}
-    </div>
-    <div class="tip-card-f">
-      <button class="btn ghost">Schedule</button>
-    </div>
-  `;
-  card.querySelector(".btn").addEventListener("click", ()=>{
-    openModalForDate(new Date());
-    $("#fType").value="Preventive";
-    $("#fMachine").value="MC_01";
-  });
-  return card;
+  const mNorm = "MC_01"; // as per your current telemetry availability
+  const lastCompletedTs = latestCompletedTsForMachine(events, mNorm) || lookBackStart.getTime();
+
+  const totalMinutes = await fetchRuntimeMinutesForMachine(mNorm, lastCompletedTs);
+  const totalHours = totalMinutes / 60.0;
+
+  const pretty = "MC_01";
+  const statusTxt = totalHours > 400 ? "Above 400 hrs (Action required)" : "Below 400 hrs";
+
+  const card = {
+    severity: totalHours > 400 ? "High" : "Info",
+    title: `Runtime monitor — ${pretty}`,
+    subtitle: `Runtime since last maintenance: ${totalHours.toFixed(1)} hrs`,
+    body: `Machine ${pretty} has run ${totalHours.toFixed(1)} hrs since last maintenance.\nStatus: ${statusTxt}.`,
+    note: `Measured from last completed maintenance; daily key: Currentday_Runtime`,
+    cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
+  };
+
+  // Only push if >400 (as per requirement), else still show Info card? We will show info too but lower severity.
+  return [card];
 }
 
-/* Render Tips (current month) */
-async function renderTips(){
-  loading("Analyzing tips…");
+/* Render helpers */
+function tipCardHTML(t){
+  const sevChip = t.severity ? `<span class="chip-note">${escapeHtml(t.severity)}</span>` : "";
+  const note = t.note ? `<div class="muted" style="margin-top:6px;font-size:12px">${escapeHtml(t.note)}</div>` : "";
+  return `
+    <div class="tip-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div class="tip-title">${escapeHtml(t.title)}</div>
+        ${sevChip}
+      </div>
+      ${ t.subtitle ? `<div class="muted" style="font-size:12px;margin:2px 0 8px">${escapeHtml(t.subtitle)}</div>` : "" }
+      <div class="tip-body">${escapeHtml(t.body)}</div>
+      ${note}
+      <div class="tip-actions">
+        ${ t.cta ? `<button class="btn" type="button">${escapeHtml(t.cta.label)}</button>` : "" }
+      </div>
+    </div>
+  `;
+}
 
+/* Main tips renderer */
+async function renderTips(){
+  loading("Analysing tips…");
+
+  // base window: current month (for coverage)
   const now = new Date();
-  const s = startOfMonth(now), e = endOfMonth(now);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try{
-    const events = await readRange(s, e);
-    state.lastEventsFull = events.slice(); // keep consistency
-    populateFilters(events);
+    const [coverageCards, runtimeCards] = await Promise.all([
+      tipsPreventiveCoverage(monthStart),
+      tipsPreventiveRuntime()
+    ]);
 
-    // prepare columns
-    const prevCol = $("#tipsPrevCol"), corrCol = $("#tipsCorrCol"), missCol = $("#tipsMissCol");
-    [prevCol, corrCol, missCol].forEach(col=>{ col.innerHTML=""; });
+    const prevBody = $("#tipsPrevBody");
+    prevBody.innerHTML = "";
+    const prevCards = [...coverageCards];
 
-    // Preventive coverage cards
-    const coverCards = buildPreventiveCoverageTips(events, s, e);
-    if (coverCards.length){
-      coverCards.forEach(c=>prevCol.appendChild(c));
-    }
-
-    // Preventive runtime (MC_01 only)
-    try{
-      const runtimeCard = await buildPreventiveRuntimeTip();
-      prevCol.appendChild(runtimeCard);
-    }catch(err){
-      console.error("Runtime card error", err);
+    // Push runtime card only if > 400 OR show anyway with Info
+    if (runtimeCards && runtimeCards.length){
+      // Only show when >400? Uncomment next line to enforce strictly:
+      // if (runtimeCards[0] && runtimeCards[0].severity!=="Info") 
+      prevCards.push(runtimeCards[0]);
     }
 
-    // fallback empties
-    if (!prevCol.children.length){
-      prevCol.innerHTML = '<div class="empty">No preventive suggestions.</div>';
+    if (!prevCards.length){
+      prevBody.innerHTML = `<div class="tip-empty">No preventive suggestions.</div>`;
+    }else{
+      prevBody.innerHTML = prevCards.map(t => tipCardHTML(t)).join("");
+      // bind CTAs
+      prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>openModalForDate(new Date()));
+      });
     }
-    if (!corrCol.children.length){
-      corrCol.innerHTML = '<div class="empty">No corrective suggestions.</div>';
-    }
-    if (!missCol.children.length){
-      missCol.innerHTML = '<div class="empty">No missed items detected.</div>';
-    }
+    $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
+
+    // Corrective & Missed placeholders
+    const corrBody = $("#tipsCorrBody");
+    corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
+    $("#tipsCorrCount").textContent = "";
+
+    const missBody = $("#tipsMissBody");
+    missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
+    $("#tipsMissCount").textContent = "";
 
     loading("Tips ready");
-  }catch(err){
-    console.error(err);
-    $("#tipsPrevCol").innerHTML = '<div class="empty">Failed to load tips.</div>';
-    $("#tipsCorrCol").innerHTML = '<div class="empty">—</div>';
-    $("#tipsMissCol").innerHTML = '<div class="empty">—</div>';
-    loading(err.message||"Failed to load tips");
+  }catch(e){
+    console.error(e);
+    $("#tipsPrevBody").innerHTML = `<div class="tip-empty">Failed to generate tips.</div>`;
+    $("#tipsCorrBody").innerHTML = `<div class="tip-empty">—</div>`;
+    $("#tipsMissBody").innerHTML = `<div class="tip-empty">—</div>`;
+    loading("Tips error");
   }
 }
 
