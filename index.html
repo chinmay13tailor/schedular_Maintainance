@@ -32,7 +32,7 @@
   /* Filters (span main + side) */
   .filters{
     grid-column:2 / -1;
-    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    display:flex;align-items:center;gap:10px;
     border:1px solid var(--ring);border-radius:12px;background:#fff;padding:10px 12px
   }
   .filters label{font-size:12px;color:#64748b;margin-right:4px}
@@ -116,22 +116,19 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
   .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
   .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
+  .chip-note{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--ring);border-radius:999px;font-size:11px;background:#f8fafc;color:#475569}
 
-  /* ===== Tips cards & tabs ===== */
-  .tips-wrap{padding:12px}
-  .tips-tabs{display:flex;gap:8px;align-items:center}
-  .tab-btn{border:1px solid var(--ring);border-radius:999px;background:#fff;padding:6px 10px;cursor:pointer;font-weight:800}
-  .tab-btn.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
-  .tab-badge{font-size:11px;background:#f1f5f9;border:1px solid var(--ring);border-radius:999px;padding:2px 8px;margin-left:6px;color:#334155}
-  .tips-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
-  .tip-card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
-  .tip-card header{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px dashed var(--ring)}
-  .tip-title{font-weight:900}
-  .tip-body{padding:10px}
-  .tip-ok{color:#16a34a;font-weight:900}
-  .tip-warn{color:#b45309;font-weight:900}
-  .tip-bad{color:#dc2626;font-weight:900}
-  .muter{color:#6b7280;font-size:12px}
+  /* ===== Tips layout ===== */
+  .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px}
+  .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
+  .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring)}
+  .tips-col h4 span{font-weight:700;color:#64748b;font-size:12px;margin-left:8px}
+  .tip-card{border-bottom:1px solid var(--ring);padding:12px}
+  .tip-card:last-child{border-bottom:0}
+  .tip-title{font-weight:900;margin-bottom:6px}
+  .tip-body{color:#334155;white-space:pre-line}
+  .tip-actions{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tip-empty{padding:14px;color:#64748b;text-align:center;background:#f8fafc;margin:10px;border-radius:10px}
 
   /* ===== PDF styles ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
@@ -246,40 +243,23 @@
 
     <!-- Tips view -->
     <div id="viewTips" style="display:none;">
-      <div class="toolbar-row" style="gap:12px;">
-        <strong style="font-size:15px;">Supervisor Tips</strong>
-        <div class="fc-toolbar-chunk legends" style="margin-left:auto">
-          <span><span class="legend-box legend-planned"></span> Planned</span>
-          <span><span class="legend-box legend-inprogress"></span> In-Progress</span>
-          <span><span class="legend-box legend-completed"></span> Completed</span>
-          <span><span class="legend-box legend-cancelled"></span> Cancelled</span>
-          <span><span class="legend-box legend-postponed"></span> Postponed</span>
-        </div>
-      </div>
-
-      <div class="tips-wrap">
-        <!-- Tabs -->
-        <div class="tips-tabs" role="tablist" aria-label="Tips categories">
-          <button id="tabPreventive" class="tab-btn active" type="button" role="tab" aria-selected="true">Preventive
-            <span id="badgePrev" class="tab-badge">0</span>
-          </button>
-          <button id="tabCorrective" class="tab-btn" type="button" role="tab" aria-selected="false">Corrective
-            <span id="badgeCorr" class="tab-badge">0</span>
-          </button>
-          <button id="tabMissed" class="tab-btn" type="button" role="tab" aria-selected="false">Missed
-            <span id="badgeMiss" class="tab-badge">0</span>
-          </button>
-        </div>
-
-        <!-- Runtime info only for Preventive -->
-        <div id="tipsRuntimeInfo" class="muter" style="margin:10px 2px 6px 2px"></div>
-
-        <!-- Content grid -->
-        <div class="tips-grid" id="tipsGrid"></div>
+      <div class="tips-grid">
+        <section class="tips-col" id="tipsPrev">
+          <h4>Preventive Maintenance <span id="tipsPrevCount"></span></h4>
+          <div id="tipsPrevBody"></div>
+        </section>
+        <section class="tips-col" id="tipsCorr">
+          <h4>Corrective Maintenance <span id="tipsCorrCount"></span></h4>
+          <div id="tipsCorrBody"></div>
+        </section>
+        <section class="tips-col" id="tipsMiss">
+          <h4>Missed Maintenance <span id="tipsMissCount"></span></h4>
+          <div id="tipsMissBody"></div>
+        </section>
       </div>
     </div>
 
-    <!-- Missed placeholder -->
+    <!-- Missed placeholder (kept) -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -313,13 +293,7 @@
 
       <div>
         <label>Machine</label>
-        <!-- Enforced machine list to avoid casing/typos -->
-        <select id="fMachine" class="input">
-          <option value="">Select machine</option>
-          <option>MC_01</option>
-          <option>MC_02</option>
-          <option>MC_03</option>
-        </select>
+        <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
       </div>
       <div>
         <label>Type</label>
@@ -403,19 +377,11 @@ var KEYS = [
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
-// Runtime telemetry per machine (for now only MC_01 provided)
-var RUNTIME_KEYS = {
-  "MC_01": "Currentday_Runtime"
-  // "MC_02": "...",
-  // "MC_03": "..."
-};
-
 /************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
 function loading(t){ $("#loading").textContent = t || ""; }
 function escapeHtml(s){ return String(s||"").replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function pad2(n){ return String(n).padStart(2,"0"); }
-function normMachine(s){ return String(s||"").trim().toUpperCase(); }
 function hhmmToMs(baseDate, hhmm){
   var p = String(hhmm||"00:00").split(":"); var h=+p[0]||0, m=+p[1]||0;
   var d = new Date(baseDate); d.setHours(h,m,0,0); return d.getTime();
@@ -443,6 +409,9 @@ function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,5
 function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0); }
 function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999); }
 
+/* >>> Case-insensitive machine normalization <<< */
+function normMachine(s){ return String(s||"").trim().toUpperCase(); }
+
 /************ STATE ************/
 var state = {
   view: "calendar",
@@ -452,12 +421,11 @@ var state = {
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
   listMonth: null,          // Date pointing to the visible month in List View
-  lastListRange: null,
-  tipsTab: "preventive",    // preventive | corrective | missed
-  tipsData: { preventive:[], corrective:[], missed:[], runtimeInfoTxt:"" }
+  lastListRange: null
 };
 
 /************ READ ************/
+/* Read events (unchanged) */
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -482,7 +450,6 @@ function readRange(rangeStart, rangeEnd){
         var st = Number(r.MS_Start || r.ts);
         var en = Number(r.MS_End || (st + 60*60*1000));
         if (!st || !en) return;
-        var mach = normMachine(r.MS_Machine || "");
         out.push({
           id: "ts-"+r.ts,
           title: r.MS_Title || "Maintenance",
@@ -491,7 +458,7 @@ function readRange(rangeStart, rangeEnd){
           classNames: ["event", colorByStatus(r.MS_Status)],
           extendedProps: {
             MS_Title: r.MS_Title || "",
-            MS_Machine: mach,
+            MS_Machine: r.MS_Machine || "",
             MS_Type: r.MS_Type || "Preventive",
             MS_Priority: r.MS_Priority != null ? r.MS_Priority : 3,
             MS_Date: r.MS_Date || null,
@@ -515,7 +482,7 @@ function populateFilters(events){
   var mas = new Set(), techs = new Set();
   events.forEach(ev=>{
     var p = ev.extendedProps||{};
-    if (p.MS_Machine) mas.add(normMachine(p.MS_Machine));
+    if (p.MS_Machine) mas.add(String(p.MS_Machine));
     if (p.MS_Technicians){
       String(p.MS_Technicians).split(",").map(s=>s.trim()).filter(Boolean).forEach(t=>techs.add(t));
     }
@@ -531,9 +498,10 @@ function populateFilters(events){
 function applyFilters(events){
   var ma=$("#filtMa").value, ty=$("#filtTy").value, st=$("#filtSt").value, tech=$("#filtTech").value;
   state.filters = { ma, ty, st, tech };
+  var maNorm = normMachine(ma);
   return events.filter(ev=>{
     var p = ev.extendedProps||{};
-    var okMa = (ma==="__ALL__" || normMachine(p.MS_Machine)===normMachine(ma));
+    var okMa = (ma==="__ALL__" || normMachine(p.MS_Machine)===maNorm);
     var okTy = (ty==="__ALL__" || String(p.MS_Type)===ty);
     var okSt = (st==="__ALL__" || String(p.MS_Status)===st);
     var okTe = (tech==="__ALL__" || (p.MS_Technicians||"").split(",").map(s=>s.trim()).includes(tech));
@@ -620,7 +588,7 @@ function showView(name){
   } else if (name==="calendar"){
     refreshCalendar();
   } else if (name==="tips"){
-    renderTips();
+    renderTips().catch(e=>console.error(e));
   } else {
     loading("");
   }
@@ -653,10 +621,10 @@ function refreshCalendar(){
 $("#btnApplyFilters").addEventListener("click", function(){
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else if (state.view==="calendar"){
-    refreshCalendar();
   } else if (state.view==="tips"){
     renderTips();
+  } else {
+    refreshCalendar();
   }
 });
 $("#btnResetFilters").addEventListener("click", function(){
@@ -664,10 +632,10 @@ $("#btnResetFilters").addEventListener("click", function(){
   state.filters = { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" };
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
-  } else if (state.view==="calendar"){
-    refreshCalendar();
   } else if (state.view==="tips"){
     renderTips();
+  } else {
+    refreshCalendar();
   }
 });
 
@@ -696,6 +664,9 @@ function startAutoRefresh(expectedTs, predicate){
         .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
       return;
     }
+    if (state.view==="tips"){
+      renderTips(); return;
+    }
     if (!state.lastRange) return;
     readRange(state.lastRange.start, state.lastRange.end)
       .then(function(events){
@@ -721,7 +692,7 @@ function writeAttributes(payload, opts){
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
   var body = {
     MS_Title: payload.MS_Title,
-    MS_Machine: normMachine(payload.MS_Machine),
+    MS_Machine: payload.MS_Machine,
     MS_Type: payload.MS_Type,
     MS_Priority: payload.MS_Priority,
     MS_Date: payload.MS_Date,
@@ -806,7 +777,7 @@ $("#btnEdit").addEventListener("click", function(){
   state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   $("#fTitle").value    = p.MS_Title || "";
-  $("#fMachine").value  = normMachine(p.MS_Machine || "");
+  $("#fMachine").value  = p.MS_Machine || "";
   $("#fType").value     = p.MS_Type || "Preventive";
   $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
   $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -828,7 +799,7 @@ $("#btnCancel").addEventListener("click", function(){
   var p = state.selectedEvent.extendedProps;
   var payload = {
     MS_Title: p.MS_Title || "",
-    MS_Machine: normMachine(p.MS_Machine || ""),
+    MS_Machine: p.MS_Machine || "",
     MS_Type: p.MS_Type || "Preventive",
     MS_Priority: p.MS_Priority != null ? p.MS_Priority : 3,
     MS_Date: p.MS_Date || null,
@@ -858,9 +829,7 @@ function openModalForDate(jsDate){
   state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
   $("#modalTitle").textContent="Add maintenance task"; $("#saveTask").textContent="Save";
 
-  $("#fTitle").value="";
-  $("#fMachine").value=""; // user must choose MC_01/02/03
-  $("#fType").value="Preventive";
+  $("#fTitle").value=""; $("#fMachine").value=""; $("#fType").value="Preventive";
   $("#fPriority").value="3";
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
@@ -875,7 +844,7 @@ function collectPayload(){
   var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
   return {
     MS_Title: ($("#fTitle").value||"").trim(),
-    MS_Machine: normMachine($("#fMachine").value || ""),
+    MS_Machine: ($("#fMachine").value||"").trim(),
     MS_Type: $("#fType").value || "Preventive",
     MS_Priority: parseInt($("#fPriority").value, 10) || 3,
     MS_Date: new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime(),
@@ -890,11 +859,10 @@ function collectPayload(){
 function validatePayload(p){
   var must = [
     ["Title", p.MS_Title],
-    ["Machine (MC_01/02/03)", p.MS_Machine],
+    ["Machine", p.MS_Machine],
     ["At least one technician", p.MS_Technicians]
   ];
   for (var i=0;i<must.length;i++){ if(!must[i][1]) return "Please enter "+must[i][0]; }
-  if (!/^MC_0[1-3]$/.test(p.MS_Machine)) return "Please pick a valid Machine (MC_01 / MC_02 / MC_03).";
   if (p.MS_End <= p.MS_Start) return "End time must be after Start time.";
   return "";
 }
@@ -1076,260 +1044,200 @@ function generatePdf(ev){
   html2pdf().from(root).set(opt).save();
 }
 
-/************ PREVENTIVE TIPS (Runtime + Coverage) ************/
-function countSchedulesForMonth(events, monthDate){
-  var s = startOfMonth(monthDate).getTime(), e = endOfMonth(monthDate).getTime();
-  var perMachine = {};
-  events.forEach(ev=>{
-    var p = ev.extendedProps||{};
-    if (ev.start.getTime()>=s && ev.start.getTime()<=e &&
-        (p.MS_Status==="Planned" || p.MS_Status==="Completed")){
-      var m = normMachine(p.MS_Machine||"");
-      if (!m) return;
-      perMachine[m] = (perMachine[m]||0)+1;
-    }
-  });
-  return perMachine;
-}
-function lastCompletedTsByMachine(events){
-  var map = {};
-  events.forEach(ev=>{
-    var p = ev.extendedProps||{};
-    if (String(p.MS_Status).toLowerCase()==="completed"){
-      var m = normMachine(p.MS_Machine||"");
-      if (!m) return;
-      var t = Number(p.MS_End || p.MS_Start || ev.start?.getTime() || 0);
-      if (!map[m] || t>map[m]) map[m]=t;
-    }
-  });
-  return map;
-}
-
-/* Telemetry read with chunking to avoid 50k limit errors */
-async function readRuntimeTelemetry(key, startMs, endMs, limit){
-  var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
-          + "?keys=" + encodeURIComponent(key) +
-            "&startTs=" + startMs +
-            "&endTs="   + endMs +
-            "&limit="   + (limit||10000);
-  const res = await fetch(url, { headers: { "X-Authorization": "Bearer " + JWT } });
-  if (!res.ok){
-    const txt = await res.text();
-    throw new Error("Runtime read failed: " + txt);
+/************ TIPS ENGINE ************/
+/* Utility: latest completed maintenance timestamp for a machine (any type) */
+function latestCompletedTsForMachine(events, mNorm){
+  let latest = null;
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    if (normMachine(p.MS_Machine)!==mNorm) continue;
+    const st = String(p.MS_Status||"").toLowerCase();
+    if (st!=="completed") continue;
+    if (latest==null || Number(p.MS_End)>latest){ latest = Number(p.MS_End); }
   }
-  return res.json();
+  return latest;
 }
-async function fetchRuntimeHoursWeekly(key, startMs, endMs){
-  let s = startMs;
-  let hoursTotal = 0;
-  let daily = [];
-  while (s <= endMs){
-    const e = Math.min(endMs, s + 6*24*60*60*1000 + (24*60*60*1000-1));
-    const data = await readRuntimeTelemetry(key, s, e, 10000);
-    const arr = data && data[key] ? data[key] : [];
-    const perDay = new Map();
-    arr.forEach(pt=>{
-      const d = new Date(Number(pt.ts));
-      const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      const prev = perDay.get(ds);
-      if (!prev || Number(pt.ts) > prev.ts) perDay.set(ds, { ts:Number(pt.ts), val:Number(pt.value)||0 });
+
+/* Fetch last value of an incremental "Currentday_Runtime" key for a single day (minutes) */
+function fetchDailyRuntimeMinutesForKey(dayDate, key){
+  const s = startOfDay(dayDate).getTime();
+  const e = endOfDay(dayDate).getTime();
+  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
+            + "?keys="+encodeURIComponent(key)
+            + "&startTs="+s+"&endTs="+e+"&limit=500";
+  return fetch(url, { headers:{ "X-Authorization":"Bearer "+JWT }})
+    .then(res=> res.ok ? res.json() : res.text().then(t=>{ throw new Error("Runtime read failed: "+t); }))
+    .then(obj=>{
+      const arr = (obj && obj[key]) || [];
+      if (!arr.length) return 0;
+      // last point's value is the total minutes for that day
+      return Number(arr[arr.length-1].value)||0;
     });
-    perDay.forEach((v, ds)=>{
-      daily.push({ day: new Date(ds), minutes: v.val });
-      hoursTotal += (v.val / 60);
-    });
-    s = e + 1;
-  }
-  return { totalHours: hoursTotal, daily };
 }
-async function fetchRuntimeHoursSince(key, fromMs){
-  const today = new Date();
-  const endMs = endOfDay(today).getTime();
 
-  let cursor = new Date(fromMs);
-  cursor = startOfDay(cursor);
-  let hoursTotal = 0;
-  let infoDaily = [];
+/* Sum runtime minutes between [fromTs, now] (inclusive) for MC_01 (key: Currentday_Runtime) */
+async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
+  // Only MC_01 wired for now as per requirement
+  if (mNorm!=="MC_01") return 0;
+  const key = "Currentday_Runtime";
 
-  while (cursor.getTime() <= endMs){
-    const chunkStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getTime();
-    const chunkEnd   = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0, 23,59,59,999).getTime();
-    const s = Math.max(fromMs, chunkStart);
-    const e = Math.min(endMs, chunkEnd);
-    if (s > e) break;
+  const start = new Date(fromTs || Date.now());
+  start.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
 
-    let data;
+  let total = 0;
+  for (let d = new Date(start); d <= today; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1)){
     try{
-      data = await readRuntimeTelemetry(key, s, e, 40000);
-    }catch(err){
-      const weekHours = await fetchRuntimeHoursWeekly(key, s, e);
-      hoursTotal += weekHours.totalHours;
-      infoDaily.push(...weekHours.daily);
-      cursor = new Date(chunkEnd + 1);
-      continue;
+      total += await fetchDailyRuntimeMinutesForKey(d, key);
+    }catch(e){
+      console.warn("Runtime fetch failed for", mNorm, e);
     }
-
-    const arr = data && data[key] ? data[key] : [];
-    const perDay = new Map();
-    arr.forEach(pt=>{
-      const d = new Date(Number(pt.ts));
-      const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      const prev = perDay.get(ds);
-      if (!prev || Number(pt.ts) > prev.ts) perDay.set(ds, { ts:Number(pt.ts), val:Number(pt.value)||0 });
-    });
-    perDay.forEach((v, ds)=>{
-      infoDaily.push({ day: new Date(ds), minutes: v.val });
-      hoursTotal += (v.val / 60);
-    });
-
-    cursor = new Date(chunkEnd + 1);
   }
-
-  return { hoursTotal, infoDaily };
+  return total; // minutes
 }
 
-/************ TIPS: BUILD + RENDER (with tabs) ************/
-async function renderTips(){
-  const baseDate = state.calendar ? state.calendar.getDate() : new Date();
-  const monthStart = startOfMonth(baseDate), monthEnd = endOfMonth(baseDate);
+/* >>> Case-insensitive preventive coverage tips (current month, planned+completed) */
+async function tipsPreventiveCoverage(monthStartDate){
+  const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
+  const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
 
-  loading("Loading tips…");
-  let events;
-  try{
-    events = await readRange(monthStart, monthEnd);
-  }catch(err){
-    console.error(err);
-    $("#tipsGrid").innerHTML = '<div class="empty">Failed to load events for tips.</div>';
-    $("#tipsRuntimeInfo").textContent = "";
-    loading("Failed to load");
-    return;
+  const events = await readRange(s,e);
+
+  const byMachine = new Map(); // key = NORM
+  for (const ev of events){
+    const p = ev.extendedProps || {};
+    const mNorm = normMachine(p.MS_Machine);
+    if (!mNorm) continue;
+    if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, countPrev: 0 });
+
+    const isPreventive = String(p.MS_Type||"").toLowerCase()==="preventive";
+    const st = String(p.MS_Status||"").toLowerCase();
+    const ok = (st==="planned" || st==="completed");
+    if (isPreventive && ok){ byMachine.get(mNorm).countPrev += 1; }
+
+    byMachine.get(mNorm).pretty = p.MS_Machine || byMachine.get(mNorm).pretty;
   }
 
-  populateFilters(events);
-  state.lastEventsFull = events.slice();
-
-  const perMachineCount = countSchedulesForMonth(events, baseDate);
-  const lastDoneThisMonth = lastCompletedTsByMachine(events);
-
-  async function ensureLastCompleted(machine){
-    if (lastDoneThisMonth[machine]) return lastDoneThisMonth[machine];
-    const backStart = new Date(); backStart.setDate(backStart.getDate()-90);
-    try{
-      const older = await readRange(backStart, new Date());
-      const olderMap = lastCompletedTsByMachine(older);
-      return olderMap[machine] || null;
-    }catch(e){ return null; }
-  }
-
-  const preventive = [];
-  const corrective = []; // TODO: fill with your corrective rules later
-  const missed     = []; // TODO: fill with your missed rules later
-  let runtimeInfoText = "";
-
-  // Preventive coverage tips
-  ["MC_01","MC_02","MC_03"].forEach(m=>{
-    const cnt = perMachineCount[m] || 0;
-    if (cnt < 2){
-      preventive.push({
-        state:"warn",
-        title:`Preventive coverage low for ${m}`,
-        body:`Current month has ${cnt} preventive schedule(s). Tip: maintain at least <strong>2</strong> preventive schedules for ${m} this month.`
-      });
-    } else {
-      preventive.push({
-        state:"ok",
-        title:`Preventive coverage OK for ${m}`,
-        body:`${cnt} preventive schedule(s) planned/completed this month.`
+  const MIN_PREV = 2;
+  const cards = [];
+  for (const [mNorm, info] of byMachine){
+    if (info.countPrev < MIN_PREV){
+      cards.push({
+        severity: info.countPrev===0 ? "High" : "Medium",
+        title: `Low preventive coverage — ${info.pretty}`,
+        subtitle: `This month preventive count: ${info.countPrev} (minimum recommended: ${MIN_PREV})`,
+        body: `You have scheduled only ${info.countPrev||0} preventive maintenance for ${info.pretty} this month.\nTip: Add more preventive schedules to meet recommended frequency.`,
+        cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
       });
     }
-  });
-
-  // Preventive runtime tip (MC_01)
-  try{
-    const m = "MC_01";
-    const key = RUNTIME_KEYS[m];
-    if (key){
-      const lastTs = await ensureLastCompleted(m);
-      const fromMs = lastTs || (new Date().setDate(new Date().getDate()-30));
-      const { hoursTotal } = await fetchRuntimeHoursSince(key, fromMs);
-
-      runtimeInfoText =
-        `Runtime since last Completed for ${m}: `+
-        `<strong>${hoursTotal.toFixed(1)} h</strong> (using per-day latest values of <em>${key}</em>)`;
-
-      if (hoursTotal > 400){
-        preventive.push({
-          state:"bad",
-          title:`${m} runtime crossed 400h`,
-          body:`Runtime since last completion is <strong>${hoursTotal.toFixed(1)} h</strong>. Please schedule maintenance.`
-        });
-      } else {
-        preventive.push({
-          state:"ok",
-          title:`${m} runtime in control`,
-          body:`Runtime since last completion is ${hoursTotal.toFixed(1)} h (threshold 400 h).`
-        });
-      }
-    } else {
-      runtimeInfoText = "Runtime tip is currently enabled for MC_01 only.";
-    }
-  }catch(err){
-    console.error("Runtime tips error:", err);
-    runtimeInfoText = "Runtime data unavailable (telemetry read error).";
   }
-
-  state.tipsData = { preventive, corrective, missed, runtimeInfoTxt: runtimeInfoText };
-  drawTipsGrid(); // draw current tab
+  return cards;
 }
 
-function drawTipsGrid(){
-  const grid = $("#tipsGrid");
-  const rtInfo = $("#tipsRuntimeInfo");
-  const tab = state.tipsTab;
-  const data = state.tipsData;
+/* Runtime tip (threshold 400 hours) only for MC_01 */
+async function tipsPreventiveRuntime(){
+  // Look back up to 120 days to find last completed
+  const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
+  const events = await readRange(lookBackStart, new Date());
 
-  // Update tab badges
-  $("#badgePrev").textContent = data.preventive.length;
-  $("#badgeCorr").textContent = data.corrective.length;
-  $("#badgeMiss").textContent = data.missed.length;
+  const mNorm = "MC_01"; // as per your current telemetry availability
+  const lastCompletedTs = latestCompletedTsForMachine(events, mNorm) || lookBackStart.getTime();
 
-  // Runtime info line only for Preventive tab
-  rtInfo.innerHTML = (tab==="preventive") ? (data.runtimeInfoTxt || "") : "";
+  const totalMinutes = await fetchRuntimeMinutesForMachine(mNorm, lastCompletedTs);
+  const totalHours = totalMinutes / 60.0;
 
-  const items = data[tab] || [];
-  if (!items.length){
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">No tips to show.</div>';
-    return;
-  }
+  const pretty = "MC_01";
+  const statusTxt = totalHours > 400 ? "Above 400 hrs (Action required)" : "Below 400 hrs";
 
-  grid.innerHTML = items.map(t=>{
-    const tone = t.state==="bad"?"tip-bad":t.state==="warn"?"tip-warn":"tip-ok";
-    return `
-      <div class="tip-card">
-        <header>
-          <span class="tip-title">${escapeHtml(t.title)}</span>
-          <span class="${tone}">●</span>
-        </header>
-        <div class="tip-body">${t.body}</div>
+  const card = {
+    severity: totalHours > 400 ? "High" : "Info",
+    title: `Runtime monitor — ${pretty}`,
+    subtitle: `Runtime since last maintenance: ${totalHours.toFixed(1)} hrs`,
+    body: `Machine ${pretty} has run ${totalHours.toFixed(1)} hrs since last maintenance.\nStatus: ${statusTxt}.`,
+    note: `Measured from last completed maintenance; daily key: Currentday_Runtime`,
+    cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
+  };
+
+  // Only push if >400 (as per requirement), else still show Info card? We will show info too but lower severity.
+  return [card];
+}
+
+/* Render helpers */
+function tipCardHTML(t){
+  const sevChip = t.severity ? `<span class="chip-note">${escapeHtml(t.severity)}</span>` : "";
+  const note = t.note ? `<div class="muted" style="margin-top:6px;font-size:12px">${escapeHtml(t.note)}</div>` : "";
+  return `
+    <div class="tip-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div class="tip-title">${escapeHtml(t.title)}</div>
+        ${sevChip}
       </div>
-    `;
-  }).join("");
+      ${ t.subtitle ? `<div class="muted" style="font-size:12px;margin:2px 0 8px">${escapeHtml(t.subtitle)}</div>` : "" }
+      <div class="tip-body">${escapeHtml(t.body)}</div>
+      ${note}
+      <div class="tip-actions">
+        ${ t.cta ? `<button class="btn" type="button">${escapeHtml(t.cta.label)}</button>` : "" }
+      </div>
+    </div>
+  `;
 }
 
-/* Tabs handlers */
-function setActiveTipTab(tab){
-  state.tipsTab = tab;
-  ["tabPreventive","tabCorrective","tabMissed"].forEach(id=>$("#"+id).classList.remove("active"));
-  if (tab==="preventive") $("#tabPreventive").classList.add("active");
-  else if (tab==="corrective") $("#tabCorrective").classList.add("active");
-  else $("#tabMissed").classList.add("active");
-  drawTipsGrid();
-}
-$("#tabPreventive").addEventListener("click", ()=>setActiveTipTab("preventive"));
-$("#tabCorrective").addEventListener("click", ()=>setActiveTipTab("corrective"));
-$("#tabMissed").addEventListener("click",     ()=>setActiveTipTab("missed"));
+/* Main tips renderer */
+async function renderTips(){
+  loading("Analysing tips…");
 
-/************ BOOT (Calendar) ************/
+  // base window: current month (for coverage)
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  try{
+    const [coverageCards, runtimeCards] = await Promise.all([
+      tipsPreventiveCoverage(monthStart),
+      tipsPreventiveRuntime()
+    ]);
+
+    const prevBody = $("#tipsPrevBody");
+    prevBody.innerHTML = "";
+    const prevCards = [...coverageCards];
+
+    // Push runtime card only if > 400 OR show anyway with Info
+    if (runtimeCards && runtimeCards.length){
+      // Only show when >400? Uncomment next line to enforce strictly:
+      // if (runtimeCards[0] && runtimeCards[0].severity!=="Info") 
+      prevCards.push(runtimeCards[0]);
+    }
+
+    if (!prevCards.length){
+      prevBody.innerHTML = `<div class="tip-empty">No preventive suggestions.</div>`;
+    }else{
+      prevBody.innerHTML = prevCards.map(t => tipCardHTML(t)).join("");
+      // bind CTAs
+      prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>openModalForDate(new Date()));
+      });
+    }
+    $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
+
+    // Corrective & Missed placeholders
+    const corrBody = $("#tipsCorrBody");
+    corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
+    $("#tipsCorrCount").textContent = "";
+
+    const missBody = $("#tipsMissBody");
+    missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
+    $("#tipsMissCount").textContent = "";
+
+    loading("Tips ready");
+  }catch(e){
+    console.error(e);
+    $("#tipsPrevBody").innerHTML = `<div class="tip-empty">Failed to generate tips.</div>`;
+    $("#tipsCorrBody").innerHTML = `<div class="tip-empty">—</div>`;
+    $("#tipsMissBody").innerHTML = `<div class="tip-empty">—</div>`;
+    loading("Tips error");
+  }
+}
+
+/************ BOOT ************/
 function startCalendar(){
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
