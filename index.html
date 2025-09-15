@@ -117,9 +117,13 @@
   .badge.planned{background:var(--blue)} .badge.inprogress{background:var(--amber)}
   .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
 
-  /* ===== Tips cards ===== */
+  /* ===== Tips cards & tabs ===== */
   .tips-wrap{padding:12px}
-  .tips-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .tips-tabs{display:flex;gap:8px;align-items:center}
+  .tab-btn{border:1px solid var(--ring);border-radius:999px;background:#fff;padding:6px 10px;cursor:pointer;font-weight:800}
+  .tab-btn.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  .tab-badge{font-size:11px;background:#f1f5f9;border:1px solid var(--ring);border-radius:999px;padding:2px 8px;margin-left:6px;color:#334155}
+  .tips-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
   .tip-card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
   .tip-card header{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px dashed var(--ring)}
   .tip-title{font-weight:900}
@@ -252,11 +256,26 @@
           <span><span class="legend-box legend-postponed"></span> Postponed</span>
         </div>
       </div>
+
       <div class="tips-wrap">
-        <div id="tipsRuntimeInfo" class="muter" style="margin:6px 2px 10px 2px"></div>
-        <div class="tips-grid" id="tipsGrid">
-          <!-- runtime + preventive coverage tips injected here -->
+        <!-- Tabs -->
+        <div class="tips-tabs" role="tablist" aria-label="Tips categories">
+          <button id="tabPreventive" class="tab-btn active" type="button" role="tab" aria-selected="true">Preventive
+            <span id="badgePrev" class="tab-badge">0</span>
+          </button>
+          <button id="tabCorrective" class="tab-btn" type="button" role="tab" aria-selected="false">Corrective
+            <span id="badgeCorr" class="tab-badge">0</span>
+          </button>
+          <button id="tabMissed" class="tab-btn" type="button" role="tab" aria-selected="false">Missed
+            <span id="badgeMiss" class="tab-badge">0</span>
+          </button>
         </div>
+
+        <!-- Runtime info only for Preventive -->
+        <div id="tipsRuntimeInfo" class="muter" style="margin:10px 2px 6px 2px"></div>
+
+        <!-- Content grid -->
+        <div class="tips-grid" id="tipsGrid"></div>
       </div>
     </div>
 
@@ -384,11 +403,11 @@ var KEYS = [
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
-// Runtime telemetry per machine (for now only MC_01 provided as per your note)
+// Runtime telemetry per machine (for now only MC_01 provided)
 var RUNTIME_KEYS = {
   "MC_01": "Currentday_Runtime"
-  // "MC_02": "Currentday_Runtime_MC_02", // when available
-  // "MC_03": "Currentday_Runtime_MC_03"  // when available
+  // "MC_02": "...",
+  // "MC_03": "..."
 };
 
 /************ HELPERS ************/
@@ -433,7 +452,9 @@ var state = {
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
   listMonth: null,          // Date pointing to the visible month in List View
-  lastListRange: null
+  lastListRange: null,
+  tipsTab: "preventive",    // preventive | corrective | missed
+  tipsData: { preventive:[], corrective:[], missed:[], runtimeInfoTxt:"" }
 };
 
 /************ READ ************/
@@ -461,7 +482,6 @@ function readRange(rangeStart, rangeEnd){
         var st = Number(r.MS_Start || r.ts);
         var en = Number(r.MS_End || (st + 60*60*1000));
         if (!st || !en) return;
-        // normalize machine code
         var mach = normMachine(r.MS_Machine || "");
         out.push({
           id: "ts-"+r.ts,
@@ -1057,7 +1077,6 @@ function generatePdf(ev){
 }
 
 /************ PREVENTIVE TIPS (Runtime + Coverage) ************/
-/* Utility: group by machine, month counts */
 function countSchedulesForMonth(events, monthDate){
   var s = startOfMonth(monthDate).getTime(), e = endOfMonth(monthDate).getTime();
   var perMachine = {};
@@ -1072,8 +1091,6 @@ function countSchedulesForMonth(events, monthDate){
   });
   return perMachine;
 }
-
-/* Find last completed maintenance ts per machine */
 function lastCompletedTsByMachine(events){
   var map = {};
   events.forEach(ev=>{
@@ -1102,33 +1119,49 @@ async function readRuntimeTelemetry(key, startMs, endMs, limit){
   }
   return res.json();
 }
-
-/* For a range, get per-day latest value (minutes), then sum (minutes) => return hours */
+async function fetchRuntimeHoursWeekly(key, startMs, endMs){
+  let s = startMs;
+  let hoursTotal = 0;
+  let daily = [];
+  while (s <= endMs){
+    const e = Math.min(endMs, s + 6*24*60*60*1000 + (24*60*60*1000-1));
+    const data = await readRuntimeTelemetry(key, s, e, 10000);
+    const arr = data && data[key] ? data[key] : [];
+    const perDay = new Map();
+    arr.forEach(pt=>{
+      const d = new Date(Number(pt.ts));
+      const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const prev = perDay.get(ds);
+      if (!prev || Number(pt.ts) > prev.ts) perDay.set(ds, { ts:Number(pt.ts), val:Number(pt.value)||0 });
+    });
+    perDay.forEach((v, ds)=>{
+      daily.push({ day: new Date(ds), minutes: v.val });
+      hoursTotal += (v.val / 60);
+    });
+    s = e + 1;
+  }
+  return { totalHours: hoursTotal, daily };
+}
 async function fetchRuntimeHoursSince(key, fromMs){
   const today = new Date();
   const endMs = endOfDay(today).getTime();
 
-  // Split by month to keep results under server limit
   let cursor = new Date(fromMs);
   cursor = startOfDay(cursor);
   let hoursTotal = 0;
-  let infoDaily = []; // for UI debug
+  let infoDaily = [];
 
   while (cursor.getTime() <= endMs){
     const chunkStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getTime();
     const chunkEnd   = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0, 23,59,59,999).getTime();
     const s = Math.max(fromMs, chunkStart);
     const e = Math.min(endMs, chunkEnd);
-
-    // If window is in the future (shouldn't), break
     if (s > e) break;
 
     let data;
     try{
-      // Start with a higher limit; if server complains, fall back smaller windows
       data = await readRuntimeTelemetry(key, s, e, 40000);
     }catch(err){
-      // try smaller limit / smaller window (weekly)
       const weekHours = await fetchRuntimeHoursWeekly(key, s, e);
       hoursTotal += weekHours.totalHours;
       infoDaily.push(...weekHours.daily);
@@ -1137,7 +1170,6 @@ async function fetchRuntimeHoursSince(key, fromMs){
     }
 
     const arr = data && data[key] ? data[key] : [];
-    // group by day → pick latest value per day
     const perDay = new Map();
     arr.forEach(pt=>{
       const d = new Date(Number(pt.ts));
@@ -1156,33 +1188,8 @@ async function fetchRuntimeHoursSince(key, fromMs){
   return { hoursTotal, infoDaily };
 }
 
-async function fetchRuntimeHoursWeekly(key, startMs, endMs){
-  let s = startMs;
-  let hoursTotal = 0;
-  let daily = [];
-  while (s <= endMs){
-    const e = Math.min(endMs, s + 6*24*60*60*1000 + (24*60*60*1000-1)); // up to 7 days
-    const data = await readRuntimeTelemetry(key, s, e, 10000);
-    const arr = data && data[key] ? data[key] : [];
-    const perDay = new Map();
-    arr.forEach(pt=>{
-      const d = new Date(Number(pt.ts));
-      const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      const prev = perDay.get(ds);
-      if (!prev || Number(pt.ts) > prev.ts) perDay.set(ds, { ts:Number(pt.ts), val:Number(pt.value)||0 });
-    });
-    perDay.forEach((v, ds)=>{
-      daily.push({ day: new Date(ds), minutes: v.val });
-      hoursTotal += (v.val / 60);
-    });
-    s = e + 1;
-  }
-  return { totalHours: hoursTotal, daily };
-}
-
-/* Render Tips */
+/************ TIPS: BUILD + RENDER (with tabs) ************/
 async function renderTips(){
-  // Base events — we use the current calendar month’s events to compute coverage
   const baseDate = state.calendar ? state.calendar.getDate() : new Date();
   const monthStart = startOfMonth(baseDate), monthEnd = endOfMonth(baseDate);
 
@@ -1198,19 +1205,14 @@ async function renderTips(){
     return;
   }
 
-  // Keep filters consistent with other views
   populateFilters(events);
   state.lastEventsFull = events.slice();
 
-  // === Preventive coverage tip (per machine, current month planned + completed)
   const perMachineCount = countSchedulesForMonth(events, baseDate);
+  const lastDoneThisMonth = lastCompletedTsByMachine(events);
 
-  // === Runtime tip (since last completed) — only MC_01 supported now
-  const lastDone = lastCompletedTsByMachine(events); // by machine, within this month (we also fallback earlier)
-  // If not found in this month, we need to look back a bit to find last completed:
-  // Search back 90 days quickly
   async function ensureLastCompleted(machine){
-    if (lastDone[machine]) return lastDone[machine];
+    if (lastDoneThisMonth[machine]) return lastDoneThisMonth[machine];
     const backStart = new Date(); backStart.setDate(backStart.getDate()-90);
     try{
       const older = await readRange(backStart, new Date());
@@ -1219,59 +1221,53 @@ async function renderTips(){
     }catch(e){ return null; }
   }
 
-  const tips = [];
+  const preventive = [];
+  const corrective = []; // TODO: fill with your corrective rules later
+  const missed     = []; // TODO: fill with your missed rules later
+  let runtimeInfoText = "";
 
-  // Coverage tips for MC_01/02/03 (requirement: at least 2 schedules in the month)
+  // Preventive coverage tips
   ["MC_01","MC_02","MC_03"].forEach(m=>{
     const cnt = perMachineCount[m] || 0;
     if (cnt < 2){
-      tips.push({
-        kind:"coverage",
-        machine:m,
+      preventive.push({
         state:"warn",
         title:`Preventive coverage low for ${m}`,
-        body:`Current month has ${cnt} preventive schedule(s). Tip: maintain at least <strong>2</strong> preventive schedules for ${m} this month.`,
+        body:`Current month has ${cnt} preventive schedule(s). Tip: maintain at least <strong>2</strong> preventive schedules for ${m} this month.`
       });
     } else {
-      tips.push({
-        kind:"coverage",
-        machine:m,
+      preventive.push({
         state:"ok",
         title:`Preventive coverage OK for ${m}`,
-        body:`${cnt} preventive schedule(s) planned/completed this month.`,
+        body:`${cnt} preventive schedule(s) planned/completed this month.`
       });
     }
   });
 
-  // Runtime tip only for MC_01 (as of now)
-  let runtimeInfoText = "";
+  // Preventive runtime tip (MC_01)
   try{
     const m = "MC_01";
     const key = RUNTIME_KEYS[m];
     if (key){
       const lastTs = await ensureLastCompleted(m);
-      const fromMs = lastTs || (new Date().setDate(new Date().getDate()-30)); // fallback to last 30 days
-      const { hoursTotal, infoDaily } = await fetchRuntimeHoursSince(key, fromMs);
+      const fromMs = lastTs || (new Date().setDate(new Date().getDate()-30));
+      const { hoursTotal } = await fetchRuntimeHoursSince(key, fromMs);
 
       runtimeInfoText =
         `Runtime since last Completed for ${m}: `+
-        `<strong>${hoursTotal.toFixed(1)} h</strong> (based on per-day latest values of <em>${key}</em>)`;
+        `<strong>${hoursTotal.toFixed(1)} h</strong> (using per-day latest values of <em>${key}</em>)`;
 
       if (hoursTotal > 400){
-        tips.push({
-          kind:"runtime",
-          machine:m,
+        preventive.push({
           state:"bad",
           title:`${m} runtime crossed 400h`,
-          body:`Runtime since last completion is <strong>${hoursTotal.toFixed(1)} h</strong>. Please schedule maintenance.`,
+          body:`Runtime since last completion is <strong>${hoursTotal.toFixed(1)} h</strong>. Please schedule maintenance.`
         });
       } else {
-        tips.push({
-          kind:"runtime",
-          machine:m,
+        preventive.push({
           state:"ok",
           title:`${m} runtime in control`,
-          body:`Runtime since last completion is ${hoursTotal.toFixed(1)} h (threshold 400 h).`,
+          body:`Runtime since last completion is ${hoursTotal.toFixed(1)} h (threshold 400 h).`
         });
       }
     } else {
@@ -1282,32 +1278,56 @@ async function renderTips(){
     runtimeInfoText = "Runtime data unavailable (telemetry read error).";
   }
 
-  // Render tips grid
+  state.tipsData = { preventive, corrective, missed, runtimeInfoTxt: runtimeInfoText };
+  drawTipsGrid(); // draw current tab
+}
+
+function drawTipsGrid(){
   const grid = $("#tipsGrid");
-  if (!tips.length){
-    grid.innerHTML = '<div class="empty">No tips to show.</div>';
-  } else {
-    grid.innerHTML = tips.map(t=>{
-      const tone = t.state==="bad"?"tip-bad":t.state==="warn"?"tip-warn":"tip-ok";
-      return `
-        <div class="tip-card">
-          <header>
-            <span class="tip-title">${escapeHtml(t.title)}</span>
-            <span class="${tone}">●</span>
-          </header>
-          <div class="tip-body">
-            <div>${t.body}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
+  const rtInfo = $("#tipsRuntimeInfo");
+  const tab = state.tipsTab;
+  const data = state.tipsData;
+
+  // Update tab badges
+  $("#badgePrev").textContent = data.preventive.length;
+  $("#badgeCorr").textContent = data.corrective.length;
+  $("#badgeMiss").textContent = data.missed.length;
+
+  // Runtime info line only for Preventive tab
+  rtInfo.innerHTML = (tab==="preventive") ? (data.runtimeInfoTxt || "") : "";
+
+  const items = data[tab] || [];
+  if (!items.length){
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">No tips to show.</div>';
+    return;
   }
 
-  // Show runtime info ONLY in tips section (as requested)
-  $("#tipsRuntimeInfo").innerHTML = runtimeInfoText;
-
-  loading("Tips ready");
+  grid.innerHTML = items.map(t=>{
+    const tone = t.state==="bad"?"tip-bad":t.state==="warn"?"tip-warn":"tip-ok";
+    return `
+      <div class="tip-card">
+        <header>
+          <span class="tip-title">${escapeHtml(t.title)}</span>
+          <span class="${tone}">●</span>
+        </header>
+        <div class="tip-body">${t.body}</div>
+      </div>
+    `;
+  }).join("");
 }
+
+/* Tabs handlers */
+function setActiveTipTab(tab){
+  state.tipsTab = tab;
+  ["tabPreventive","tabCorrective","tabMissed"].forEach(id=>$("#"+id).classList.remove("active"));
+  if (tab==="preventive") $("#tabPreventive").classList.add("active");
+  else if (tab==="corrective") $("#tabCorrective").classList.add("active");
+  else $("#tabMissed").classList.add("active");
+  drawTipsGrid();
+}
+$("#tabPreventive").addEventListener("click", ()=>setActiveTipTab("preventive"));
+$("#tabCorrective").addEventListener("click", ()=>setActiveTipTab("corrective"));
+$("#tabMissed").addEventListener("click",     ()=>setActiveTipTab("missed"));
 
 /************ BOOT (Calendar) ************/
 function startCalendar(){
