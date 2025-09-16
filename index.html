@@ -259,7 +259,7 @@
       </div>
     </div>
 
-    <!-- Missed placeholder (kept) -->
+    <!-- Missed placeholder -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -293,7 +293,12 @@
 
       <div>
         <label>Machine</label>
-        <input id="fMachine" class="input" type="text" placeholder="e.g., LATHE-02">
+        <!-- CHANGED: fixed dropdown -->
+        <select id="fMachine" class="input">
+          <option>MC_01</option>
+          <option>MC_02</option>
+          <option>MC_03</option>
+        </select>
       </div>
       <div>
         <label>Type</label>
@@ -377,6 +382,9 @@ var KEYS = [
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
+/* Fixed machine choices for modal */
+const MACHINE_OPTIONS = ["MC_01","MC_02","MC_03"];
+
 /************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
 function loading(t){ $("#loading").textContent = t || ""; }
@@ -425,7 +433,7 @@ var state = {
 };
 
 /************ READ ************/
-/* Read events (unchanged) */
+/* Read events */
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -692,7 +700,7 @@ function writeAttributes(payload, opts){
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
   var body = {
     MS_Title: payload.MS_Title,
-    MS_Machine: payload.MS_Machine,
+    MS_Machine: payload.MS_Machine, // already normalized
     MS_Type: payload.MS_Type,
     MS_Priority: payload.MS_Priority,
     MS_Date: payload.MS_Date,
@@ -777,7 +785,7 @@ $("#btnEdit").addEventListener("click", function(){
   state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   $("#fTitle").value    = p.MS_Title || "";
-  $("#fMachine").value  = p.MS_Machine || "";
+  $("#fMachine").value  = normMachine(p.MS_Machine || MACHINE_OPTIONS[0]); // ensure option exists
   $("#fType").value     = p.MS_Type || "Preventive";
   $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
   $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -799,7 +807,7 @@ $("#btnCancel").addEventListener("click", function(){
   var p = state.selectedEvent.extendedProps;
   var payload = {
     MS_Title: p.MS_Title || "",
-    MS_Machine: p.MS_Machine || "",
+    MS_Machine: normMachine(p.MS_Machine || ""),
     MS_Type: p.MS_Type || "Preventive",
     MS_Priority: p.MS_Priority != null ? p.MS_Priority : 3,
     MS_Date: p.MS_Date || null,
@@ -829,7 +837,7 @@ function openModalForDate(jsDate){
   state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
   $("#modalTitle").textContent="Add maintenance task"; $("#saveTask").textContent="Save";
 
-  $("#fTitle").value=""; $("#fMachine").value=""; $("#fType").value="Preventive";
+  $("#fTitle").value=""; $("#fMachine").value=MACHINE_OPTIONS[0]; $("#fType").value="Preventive";
   $("#fPriority").value="3";
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
@@ -844,7 +852,7 @@ function collectPayload(){
   var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
   return {
     MS_Title: ($("#fTitle").value||"").trim(),
-    MS_Machine: ($("#fMachine").value||"").trim(),
+    MS_Machine: normMachine($("#fMachine").value || ""),   // <<< normalize at save
     MS_Type: $("#fType").value || "Preventive",
     MS_Priority: parseInt($("#fPriority").value, 10) || 3,
     MS_Date: new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime(),
@@ -894,7 +902,7 @@ function onUpdate(){
       startAutoRefresh(payload[ATTR_MS_UPD_TS], function(found){
         var p = found.extendedProps || {};
         var titleOk = String(p.MS_Title||"") === String(payload.MS_Title||"");
-        var machOk  = String(p.MS_Machine||"") === String(payload.MS_Machine||"");
+        var machOk  = normMachine(p.MS_Machine||"") === String(payload.MS_Machine||"");
         var typeOk  = String(p.MS_Type||"") === String(payload.MS_Type||"");
         var priOk   = String(p.MS_Priority) === String(payload.MS_Priority);
         var stOk    = String(p.MS_Status||"") === String(payload.MS_Status||"");
@@ -1096,7 +1104,7 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
   return total; // minutes
 }
 
-/* >>> Case-insensitive preventive coverage tips (current month, planned+completed) */
+/* Preventive coverage (current month, planned+completed) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1140,7 +1148,7 @@ async function tipsPreventiveRuntime(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
   const events = await readRange(lookBackStart, new Date());
 
-  const mNorm = "MC_01"; // as per your current telemetry availability
+  const mNorm = "MC_01";
   const lastCompletedTs = latestCompletedTsForMachine(events, mNorm) || lookBackStart.getTime();
 
   const totalMinutes = await fetchRuntimeMinutesForMachine(mNorm, lastCompletedTs);
@@ -1158,8 +1166,61 @@ async function tipsPreventiveRuntime(){
     cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
   };
 
-  // Only push if >400 (as per requirement), else still show Info card? We will show info too but lower severity.
   return [card];
+}
+
+/* Corrective tips: highlight machines with corrective jobs this month */
+async function tipsCorrective(monthStartDate){
+  const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
+  const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
+  const events = await readRange(s,e);
+
+  const counts = new Map(); // mNorm -> {pretty, count}
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    const isCorr = String(p.MS_Type||"").toLowerCase()==="corrective";
+    if (!isCorr) continue;
+    const mNorm = normMachine(p.MS_Machine); if(!mNorm) continue;
+    if (!counts.has(mNorm)) counts.set(mNorm, { pretty:p.MS_Machine, count:0 });
+    counts.get(mNorm).count++;
+  }
+
+  const cards=[];
+  for (const [mNorm, info] of counts){
+    cards.push({
+      severity: info.count>=2 ? "Medium" : "Info",
+      title: `Corrective activity detected — ${info.pretty}`,
+      subtitle: `This month corrective tasks: ${info.count}`,
+      body: `Consider a quick RCA for ${info.pretty} to reduce unplanned corrective tasks.\nTip: add targeted PM points or spares check.`,
+      cta: { label: "Add PM", action: () => openModalForDate(new Date()) }
+    });
+  }
+  return cards;
+}
+
+/* Missed tips: overdue planned/in-progress tasks (start time in past, not done/cancelled/postponed) */
+async function tipsMissed(){
+  const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-60);
+  const now = new Date();
+  const events = await readRange(lookBackStart, now);
+
+  const missed = [];
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    const st = String(p.MS_Status||"").toLowerCase();
+    const isOpen = (st==="planned" || st==="in-progress" || st==="inprogress");
+    if (!isOpen) continue;
+    if (Number(p.MS_Start) < Date.now()){
+      missed.push({
+        severity: "High",
+        title: `Overdue: ${p.MS_Title || "Maintenance"} — ${p.MS_Machine||"-"}`,
+        subtitle: `Scheduled for ${new Date(Number(p.MS_Start)||Date.now()).toLocaleString()}`,
+        body: `This task is overdue. Update status or reschedule.`,
+        cta: { label: "Reschedule", action: () => openModalForDate(new Date()) }
+      });
+    }
+  }
+  return missed;
 }
 
 /* Render helpers */
@@ -1186,46 +1247,58 @@ function tipCardHTML(t){
 async function renderTips(){
   loading("Analysing tips…");
 
-  // base window: current month (for coverage)
+  // base window: current month (for coverage/corrective)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try{
-    const [coverageCards, runtimeCards] = await Promise.all([
+    const [coverageCards, runtimeCards, correctiveCards, missedCards] = await Promise.all([
       tipsPreventiveCoverage(monthStart),
-      tipsPreventiveRuntime()
+      tipsPreventiveRuntime(),
+      tipsCorrective(monthStart),
+      tipsMissed()
     ]);
 
+    // PREVENTIVE
     const prevBody = $("#tipsPrevBody");
     prevBody.innerHTML = "";
     const prevCards = [...coverageCards];
-
-    // Push runtime card only if > 400 OR show anyway with Info
-    if (runtimeCards && runtimeCards.length){
-      // Only show when >400? Uncomment next line to enforce strictly:
-      // if (runtimeCards[0] && runtimeCards[0].severity!=="Info") 
-      prevCards.push(runtimeCards[0]);
-    }
-
+    if (runtimeCards && runtimeCards.length){ prevCards.push(runtimeCards[0]); }
     if (!prevCards.length){
       prevBody.innerHTML = `<div class="tip-empty">No preventive suggestions.</div>`;
     }else{
       prevBody.innerHTML = prevCards.map(t => tipCardHTML(t)).join("");
-      // bind CTAs
       prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
         btn.addEventListener("click", ()=>openModalForDate(new Date()));
       });
     }
     $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
 
-    // Corrective & Missed placeholders
+    // CORRECTIVE
     const corrBody = $("#tipsCorrBody");
-    corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
-    $("#tipsCorrCount").textContent = "";
+    if (!correctiveCards.length){
+      corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
+      $("#tipsCorrCount").textContent = "";
+    } else {
+      corrBody.innerHTML = correctiveCards.map(t=>tipCardHTML(t)).join("");
+      corrBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>openModalForDate(new Date()));
+      });
+      $("#tipsCorrCount").textContent = `(${correctiveCards.length})`;
+    }
 
+    // MISSED
     const missBody = $("#tipsMissBody");
-    missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
-    $("#tipsMissCount").textContent = "";
+    if (!missedCards.length){
+      missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
+      $("#tipsMissCount").textContent = "";
+    } else {
+      missBody.innerHTML = missedCards.map(t=>tipCardHTML(t)).join("");
+      missBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>openModalForDate(new Date()));
+      });
+      $("#tipsMissCount").textContent = `(${missedCards.length})`;
+    }
 
     loading("Tips ready");
   }catch(e){
@@ -1239,6 +1312,12 @@ async function renderTips(){
 
 /************ BOOT ************/
 function startCalendar(){
+  // Ensure modal machine options reflect fixed list (in case HTML was cached)
+  const fMachine = $("#fMachine");
+  if (fMachine && fMachine.tagName === "SELECT"){
+    fMachine.innerHTML = MACHINE_OPTIONS.map(m=>`<option>${m}</option>`).join("");
+  }
+
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
       '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
