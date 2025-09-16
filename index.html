@@ -257,9 +257,17 @@
           <div id="tipsMissBody"></div>
         </section>
       </div>
+
+      <!-- NEW: Info panel (full width) for runtime etc. -->
+      <div style="padding:12px;">
+        <section class="tips-col" id="tipsInfo" style="max-width:100%;">
+          <h4>Info <span id="tipsInfoCount"></span></h4>
+          <div id="tipsInfoBody"></div>
+        </section>
+      </div>
     </div>
 
-    <!-- Missed placeholder -->
+    <!-- Missed placeholder (kept) -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -293,7 +301,7 @@
 
       <div>
         <label>Machine</label>
-        <!-- CHANGED: fixed dropdown -->
+        <!-- Dropdown to avoid typos -->
         <select id="fMachine" class="input">
           <option>MC_01</option>
           <option>MC_02</option>
@@ -382,7 +390,7 @@ var KEYS = [
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
-/* Fixed machine choices for modal */
+// Fixed machine options for modal
 const MACHINE_OPTIONS = ["MC_01","MC_02","MC_03"];
 
 /************ HELPERS ************/
@@ -417,7 +425,7 @@ function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,5
 function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0); }
 function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23,59,59,999); }
 
-/* >>> Case-insensitive machine normalization <<< */
+/* Case-insensitive machine normalization */
 function normMachine(s){ return String(s||"").trim().toUpperCase(); }
 
 /************ STATE ************/
@@ -428,7 +436,7 @@ var state = {
   technicians: [],
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
-  listMonth: null,          // Date pointing to the visible month in List View
+  listMonth: null,
   lastListRange: null
 };
 
@@ -472,7 +480,7 @@ function readRange(rangeStart, rangeEnd){
             MS_Date: r.MS_Date || null,
             MS_Start: st,
             MS_End: en,
-            MS_Status: r.MS_Status || "Planned",
+            MS_Status: String(r.MS_Status || "Planned").trim().replace(/inprogress/i,"In-Progress"),
             MS_Description: r.MS_Description || "",
             MS_Technicians: r.MS_Technicians || "",
             MS_Task: r.MS_Task || "",
@@ -700,7 +708,7 @@ function writeAttributes(payload, opts){
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/SERVER_SCOPE";
   var body = {
     MS_Title: payload.MS_Title,
-    MS_Machine: payload.MS_Machine, // already normalized
+    MS_Machine: payload.MS_Machine, // normalized already
     MS_Type: payload.MS_Type,
     MS_Priority: payload.MS_Priority,
     MS_Date: payload.MS_Date,
@@ -785,7 +793,7 @@ $("#btnEdit").addEventListener("click", function(){
   state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   $("#fTitle").value    = p.MS_Title || "";
-  $("#fMachine").value  = normMachine(p.MS_Machine || MACHINE_OPTIONS[0]); // ensure option exists
+  $("#fMachine").value  = normMachine(p.MS_Machine || MACHINE_OPTIONS[0]);
   $("#fType").value     = p.MS_Type || "Preventive";
   $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
   $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -852,7 +860,7 @@ function collectPayload(){
   var base = parts ? new Date(parts[0], parts[1]-1, parts[2]) : (state.pickedDate || new Date());
   return {
     MS_Title: ($("#fTitle").value||"").trim(),
-    MS_Machine: normMachine($("#fMachine").value || ""),   // <<< normalize at save
+    MS_Machine: normMachine($("#fMachine").value || ""),
     MS_Type: $("#fType").value || "Preventive",
     MS_Priority: parseInt($("#fPriority").value, 10) || 3,
     MS_Date: new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime(),
@@ -1085,7 +1093,7 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
 
 /* Sum runtime minutes between [fromTs, now] (inclusive) for MC_01 (key: Currentday_Runtime) */
 async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
-  // Only MC_01 wired for now as per requirement
+  // Only MC_01 wired for now
   if (mNorm!=="MC_01") return 0;
   const key = "Currentday_Runtime";
 
@@ -1104,12 +1112,18 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
   return total; // minutes
 }
 
-/* Preventive coverage (current month, planned+completed) */
+/* Preventive coverage (current month, robust counting) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
 
-  const events = await readRange(s,e);
+  let events;
+  try{
+    events = await readRange(s,e);
+  }catch(err){
+    console.error("Preventive coverage fetch failed", err);
+    throw err;
+  }
 
   const byMachine = new Map(); // key = NORM
   for (const ev of events){
@@ -1117,18 +1131,16 @@ async function tipsPreventiveCoverage(monthStartDate){
     const mNorm = normMachine(p.MS_Machine);
     if (!mNorm) continue;
 
-    // Normalize and be lenient
     const type = String(p.MS_Type||"").trim().toLowerCase();
     const st   = String(p.MS_Status||"").trim().toLowerCase().replace("inprogress","in-progress");
     const isPreventive = (type === "preventive");
-    const scheduledStatuses = new Set(["planned","in-progress","completed","postponed"]); // count these
+    const scheduledStatuses = new Set(["planned","in-progress","completed","postponed"]);
     const ok = scheduledStatuses.has(st);
 
     if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, countPrev: 0 });
 
     if (isPreventive && ok){ byMachine.get(mNorm).countPrev += 1; }
 
-    // keep last pretty seen
     byMachine.get(mNorm).pretty = p.MS_Machine || byMachine.get(mNorm).pretty;
   }
 
@@ -1148,10 +1160,8 @@ async function tipsPreventiveCoverage(monthStartDate){
   return cards;
 }
 
-
-/* Runtime tip (threshold 400 hours) only for MC_01 */
+/* Runtime tip (threshold 400 hours) only for MC_01 — now rendered in "Info" */
 async function tipsPreventiveRuntime(){
-  // Look back up to 120 days to find last completed
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
   const events = await readRange(lookBackStart, new Date());
 
@@ -1176,7 +1186,7 @@ async function tipsPreventiveRuntime(){
   return [card];
 }
 
-/* Corrective tips: highlight machines with corrective jobs this month */
+/* Corrective tips: machines with corrective jobs this month */
 async function tipsCorrective(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1185,7 +1195,7 @@ async function tipsCorrective(monthStartDate){
   const counts = new Map(); // mNorm -> {pretty, count}
   for (const ev of events){
     const p = ev.extendedProps||{};
-    const isCorr = String(p.MS_Type||"").toLowerCase()==="corrective";
+    const isCorr = String(p.MS_Type||"").trim().toLowerCase()==="corrective";
     if (!isCorr) continue;
     const mNorm = normMachine(p.MS_Machine); if(!mNorm) continue;
     if (!counts.has(mNorm)) counts.set(mNorm, { pretty:p.MS_Machine, count:0 });
@@ -1205,7 +1215,7 @@ async function tipsCorrective(monthStartDate){
   return cards;
 }
 
-/* Missed tips: overdue planned/in-progress tasks (start time in past, not done/cancelled/postponed) */
+/* Missed tips: overdue planned/in-progress tasks */
 async function tipsMissed(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-60);
   const now = new Date();
@@ -1250,7 +1260,7 @@ function tipCardHTML(t){
   `;
 }
 
-/* Main tips renderer */
+/* Main tips renderer — runtime shown in Info panel */
 async function renderTips(){
   loading("Analysing tips…");
 
@@ -1260,17 +1270,17 @@ async function renderTips(){
   try{
     const [coverageCards, runtimeCards, correctiveCards, missedCards] = await Promise.all([
       tipsPreventiveCoverage(monthStart),
-      tipsPreventiveRuntime(),      // we'll render these in Info
+      tipsPreventiveRuntime(),      // render in Info (not Preventive)
       tipsCorrective(monthStart),
       tipsMissed()
     ]);
 
-    // ===== PREVENTIVE =====
+    // PREVENTIVE
     const prevBody = $("#tipsPrevBody");
-    const prevCards = [...coverageCards]; // runtime no longer pushed here
+    const prevCards = [...coverageCards];
     if (!prevCards.length){
       prevBody.innerHTML = `<div class="tip-empty">No preventive suggestions.</div>`;
-    } else {
+    }else{
       prevBody.innerHTML = prevCards.map(t => tipCardHTML(t)).join("");
       prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
         btn.addEventListener("click", ()=>openModalForDate(new Date()));
@@ -1278,7 +1288,7 @@ async function renderTips(){
     }
     $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
 
-    // ===== CORRECTIVE =====
+    // CORRECTIVE
     const corrBody = $("#tipsCorrBody");
     if (!correctiveCards.length){
       corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
@@ -1291,7 +1301,7 @@ async function renderTips(){
       $("#tipsCorrCount").textContent = `(${correctiveCards.length})`;
     }
 
-    // ===== MISSED =====
+    // MISSED
     const missBody = $("#tipsMissBody");
     if (!missedCards.length){
       missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
@@ -1304,7 +1314,7 @@ async function renderTips(){
       $("#tipsMissCount").textContent = `(${missedCards.length})`;
     }
 
-    // ===== INFO (runtime etc.) =====
+    // INFO (runtime etc.)
     const infoBody = $("#tipsInfoBody");
     const infoCards = runtimeCards || [];
     if (!infoCards.length){
@@ -1329,10 +1339,9 @@ async function renderTips(){
   }
 }
 
-
 /************ BOOT ************/
 function startCalendar(){
-  // Ensure modal machine options reflect fixed list (in case HTML was cached)
+  // ensure dropdown options
   const fMachine = $("#fMachine");
   if (fMachine && fMachine.tagName === "SELECT"){
     fMachine.innerHTML = MACHINE_OPTIONS.map(m=>`<option>${m}</option>`).join("");
