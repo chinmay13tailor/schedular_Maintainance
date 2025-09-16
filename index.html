@@ -29,7 +29,7 @@
   }
   .spacer{flex:1}
 
-  /* Filters */
+  /* Filters (span main + side) */
   .filters{
     grid-column:2 / -1;
     display:flex;align-items:center;gap:10px;
@@ -80,7 +80,7 @@
   .muted{color:#64748b}
   #loading{font-size:12px;color:#64748b;margin-left:8px}
 
-  /* FullCalendar */
+  /* FullCalendar styles */
   .fc .fc-toolbar{padding:10px}
   .fc .fc-toolbar-title{font-size:16px;font-weight:800}
   .fc .fc-button{background:#fff;border:1px solid var(--ring);color:#0f172a;border-radius:10px;padding:6px 10px}
@@ -130,7 +130,7 @@
   .tip-actions{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .tip-empty{padding:14px;color:#64748b;text-align:center;background:#f8fafc;margin:10px;border-radius:10px}
 
-  /* ===== Info strip ===== */
+  /* ===== PDF styles ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
   .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
   .r-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:12px}
@@ -151,7 +151,7 @@
   .sign{flex:1;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;min-height:72px}
   .r-fine{display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:8px 2px}
 
-  /* Modal / Overlay */
+  /* ===== Modal / Overlay ===== */
   .overlay{
     position:fixed;inset:0;background:rgba(15,23,42,.45);
     display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;
@@ -208,7 +208,7 @@
     <button class="btn" id="btnResetFilters" type="button">Reset</button>
   </div>
 
-  <!-- Main area -->
+  <!-- Main area: Calendar/List/Tips/Missed -->
   <div id="mainCard" class="card">
     <!-- Calendar view -->
     <div id="viewCalendar"><div id="calendar"></div></div>
@@ -267,7 +267,7 @@
       </div>
     </div>
 
-    <!-- Missed placeholder -->
+    <!-- Missed placeholder (kept) -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -382,20 +382,17 @@ var ATTR_MS_SAVE    = "MS_Save_Button";
 var ATTR_MS_UPDATE  = "MS_Update_Buttton";
 var ATTR_MS_UPD_TS  = "MS_Update_Timestamp";
 
-// Scheduler keys
+// Telemetry keys
 var KEYS = [
   "MS_Title","MS_Machine","MS_Type","MS_Priority",
   "MS_Date","MS_Start","MS_End",
   "MS_Status","MS_Description","MS_Technicians","MS_Task"
 ];
 
-// Downtime (MC_01) keys
+// Downtime keys for MC_01
 var DOWNTIME_KEYS = [
   "Downtime_Start_Time","Downtime_End_Time","Downtime_Duration","Downtime_Reason_Code"
 ];
-
-// Fixed machine options (for modal select)
-const MACHINE_OPTIONS = ["MC_01","MC_02","MC_03"];
 
 /************ HELPERS ************/
 function $(s){ return document.querySelector(s); }
@@ -436,6 +433,15 @@ function minutesToHM(min){
   var h = Math.floor(min/60), m = Math.round(min%60);
   return (h? h+"h ":"") + m + "m";
 }
+function humanHours(h){
+  if (!isFinite(h) || h <= 0) return "0 h";
+  if (h >= 24){
+    const d = Math.floor(h/24);
+    const rem = h - d*24;
+    return `${d} d ${rem.toFixed(1)} h`;
+  }
+  return `${h.toFixed(1)} h`;
+}
 function humanGap(ms){
   if (!isFinite(ms) || ms<=0) return "—";
   var d = ms/86400000; if (d>=1) return d.toFixed(1)+" d";
@@ -443,12 +449,12 @@ function humanGap(ms){
   var m = ms/60000;    return Math.round(m)+" m";
 }
 
-/* Robust time parsing: accepts ms, seconds (10^9…10^12), or ISO/'YYYY-MM-DD HH:mm:ss' */
+/* Robust time parsing: accepts ms, seconds, or ISO */
 function toMs(val){
   if (val==null || val==="") return NaN;
   if (typeof val === "number" && isFinite(val)){
     if (val > 1e9 && val < 1e12) return val * 1000; // seconds → ms
-    return val; // already ms (or small number)
+    return val; // already ms (or small number that could be ms)
   }
   const s = String(val).trim();
   const n = Number(s);
@@ -457,19 +463,22 @@ function toMs(val){
     return n;
   }
   let d = Date.parse(s);
-  if (isNaN(d)) d = Date.parse(s.replace(" ", "T")); // tolerate space between date/time
+  if (isNaN(d)) d = Date.parse(s.replace(" ", "T"));
   return isNaN(d) ? NaN : d;
 }
 
-/* Prefer End-Start; fall back to literal duration (minutes or ms) */
+/* Duration is logged in SECONDS.
+   Prefer End-Start; fallback to value (sec→min). Keep ms safety if legacy. */
 function normalizeDurationMinutes(val, startMs, endMs){
   if (isFinite(startMs) && isFinite(endMs) && endMs >= startMs){
-    return (endMs - startMs)/60000; // authoritative
+    return (endMs - startMs)/60000; // authoritative from timestamps
   }
   let n = Number(val);
   if (!isFinite(n) || n <= 0) return 0;
-  if (n > 1e7) return n/60000; // looks like ms → min
-  return n; // assume minutes
+  // If it looks like milliseconds (very large), convert ms→min
+  if (n > 1e7) return n/60000;
+  // Otherwise treat as SECONDS (per your data) → minutes
+  return n/60;
 }
 
 /************ STATE ************/
@@ -480,11 +489,12 @@ var state = {
   technicians: [],
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
-  listMonth: null,
+  listMonth: null,          // Date pointing to the visible month in List View
   lastListRange: null
 };
 
-/************ READ: Scheduler events ************/
+/************ READ ************/
+/* Read scheduler events */
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -552,7 +562,7 @@ async function readDowntimeLast30Days(){
   if (!res.ok){ throw new Error("Downtime read failed: "+await res.text()); }
   const obj = await res.json();
 
-  // Group all samples by their telemetry ts
+  // Group samples by telemetry ts
   const byTs = new Map();
   for (const k of DOWNTIME_KEYS){
     for (const p of (obj[k]||[])){
@@ -562,7 +572,7 @@ async function readDowntimeLast30Days(){
     }
   }
 
-  // Only use rows where Start + End + Reason exist together
+  // Only rows with Start+End+Reason at the same ts
   const events = [];
   for (const [ts, r] of byTs){
     const hasStart = r.Downtime_Start_Time != null && r.Downtime_Start_Time !== "";
@@ -575,7 +585,7 @@ async function readDowntimeLast30Days(){
     if (!isFinite(startMs) || !isFinite(endMs)) continue;
 
     const code = String(r.Downtime_Reason_Code).trim();
-    const durationMin = normalizeDurationMinutes(r.Downtime_Duration, startMs, endMs);
+    const durationMin = normalizeDurationMinutes(r.Downtime_Duration, startMs, endMs); // value is seconds
 
     events.push({ startMs, endMs, durationMin, code, machine:"MC_01" });
   }
@@ -584,32 +594,17 @@ async function readDowntimeLast30Days(){
   return { start, end, events };
 }
 
-/* Analyze downtime by Reason Code (MTBF + totals) */
+/* Group by reason: count and total downtime minutes */
 function analyzeDowntimeByCode(events){
   const byCode = new Map();
   for (const ev of events){
     const key = ev.code || "UNKNOWN";
-    if (!byCode.has(key)) byCode.set(key, { code:key, count:0, totalMin:0, starts:[] });
+    if (!byCode.has(key)) byCode.set(key, { code:key, count:0, totalMin:0 });
     const agg = byCode.get(key);
     agg.count += 1;
     agg.totalMin += Math.max(0, Number(ev.durationMin)||0);
-    agg.starts.push(ev.startMs);
   }
-  const out = [];
-  for (const [code, agg] of byCode){
-    agg.starts.sort((a,b)=>a-b);
-    let gapSum = 0, gaps = 0;
-    for (let i=1;i<agg.starts.length;i++){ gapSum += (agg.starts[i]-agg.starts[i-1]); gaps++; }
-    const mtbfMs = gaps>0 ? (gapSum/gaps) : NaN;
-    out.push({
-      code,
-      count: agg.count,
-      totalMin: agg.totalMin,
-      mtbfMs,
-      mtbfHuman: isNaN(mtbfMs) ? "—" : humanGap(mtbfMs)
-    });
-  }
-  return out;
+  return Array.from(byCode.values());
 }
 
 /************ FILTERS ************/
@@ -795,7 +790,9 @@ function startAutoRefresh(expectedTs, predicate){
         .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
       return;
     }
-    if (state.view==="tips"){ renderTips(); return; }
+    if (state.view==="tips"){
+      renderTips(); return;
+    }
     if (!state.lastRange) return;
     readRange(state.lastRange.start, state.lastRange.end)
       .then(function(events){
@@ -906,7 +903,7 @@ $("#btnEdit").addEventListener("click", function(){
   state.pickedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   $("#fTitle").value    = p.MS_Title || "";
-  $("#fMachine").value  = normMachine(p.MS_Machine || MACHINE_OPTIONS[0]);
+  $("#fMachine").value  = normMachine(p.MS_Machine || "MC_01");
   $("#fType").value     = p.MS_Type || "Preventive";
   $("#fPriority").value = String(p.MS_Priority != null ? p.MS_Priority : "3");
   $("#fDate").value     = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -958,7 +955,7 @@ function openModalForDate(jsDate){
   state.pickedDate = new Date(jsDate.getFullYear(), jsDate.getMonth(), jsDate.getDate());
   $("#modalTitle").textContent="Add maintenance task"; $("#saveTask").textContent="Save";
 
-  $("#fTitle").value=""; $("#fMachine").value=MACHINE_OPTIONS[0]; $("#fType").value="Preventive";
+  $("#fTitle").value=""; $("#fMachine").value="MC_01"; $("#fType").value="Preventive";
   $("#fPriority").value="3";
   $("#fDate").value = new Date(state.pickedDate.getTime() - state.pickedDate.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
@@ -1143,8 +1140,12 @@ function generatePdf(ev){
     <div class="r-section">
       <div class="r-sec-h">Approvals</div>
       <div class="r-foot">
-        <div class="sign"><strong>Technician Sign & Date</strong></div>
-        <div class="sign"><strong>Supervisor Sign & Date</strong></div>
+        <div class="sign">
+          <strong>Technician Sign & Date</strong>
+        </div>
+        <div class="sign">
+          <strong>Supervisor Sign & Date</strong>
+        </div>
       </div>
     </div>
 
@@ -1169,21 +1170,7 @@ function generatePdf(ev){
   html2pdf().from(root).set(opt).save();
 }
 
-/************ TIPS ENGINE ************/
-/* Latest completed timestamp for a machine (any type) */
-function latestCompletedTsForMachine(events, mNorm){
-  let latest = null;
-  for (const ev of events){
-    const p = ev.extendedProps||{};
-    if (normMachine(p.MS_Machine)!==mNorm) continue;
-    const st = String(p.MS_Status||"").toLowerCase();
-    if (st!=="completed") continue;
-    if (latest==null || Number(p.MS_End)>latest){ latest = Number(p.MS_End); }
-  }
-  return latest;
-}
-
-/* Runtime helpers (MC_01 only for now) */
+/************ RUNTIME HELPERS (MC_01 only for now) ************/
 function fetchDailyRuntimeMinutesForKey(dayDate, key){
   const s = startOfDay(dayDate).getTime();
   const e = endOfDay(dayDate).getTime();
@@ -1195,6 +1182,7 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
     .then(obj=>{
       const arr = (obj && obj[key]) || [];
       if (!arr.length) return 0;
+      // last point's value is the total minutes for that day
       return Number(arr[arr.length-1].value)||0;
     });
 }
@@ -1210,7 +1198,21 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
   return total;
 }
 
-/* Coverage (ANY type per your spec) */
+/************ TIPS ENGINE ************/
+/* Latest completed maintenance timestamp for a machine (any type) */
+function latestCompletedTsForMachine(events, mNorm){
+  let latest = null;
+  for (const ev of events){
+    const p = ev.extendedProps||{};
+    if (normMachine(p.MS_Machine)!==mNorm) continue;
+    const st = String(p.MS_Status||"").toLowerCase();
+    if (st!=="completed") continue;
+    if (latest==null || Number(p.MS_End)>latest){ latest = Number(p.MS_End); }
+  }
+  return latest;
+}
+
+/* Coverage suggestions (ANY type counts as a window) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1250,7 +1252,7 @@ async function tipsPreventiveCoverage(monthStartDate){
   return cards;
 }
 
-/* Runtime tip (shown in Info panel) */
+/* Runtime info card (shown in Info panel) */
 async function tipsPreventiveRuntime(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
   const events = await readRange(lookBackStart, new Date());
@@ -1276,7 +1278,7 @@ async function tipsPreventiveRuntime(){
   return [card];
 }
 
-/* Corrective tips driven by downtime telemetry (MC_01, last 30 days) */
+/* Corrective tips using runtime-based MTBF and seconds-based Downtime_Duration */
 async function tipsCorrectiveTelemetry(){
   try{
     const { start, end, events } = await readDowntimeLast30Days();
@@ -1289,27 +1291,39 @@ async function tipsCorrectiveTelemetry(){
       }];
     }
 
+    // Total Operating Time = Σ Currentday_Runtime (minutes) for last 30 days
+    const runtimeMinutes = await fetchRuntimeMinutesForMachine("MC_01", start.getTime());
+    const runtimeHours = runtimeMinutes / 60;
+
     const stats = analyzeDowntimeByCode(events);
-    // Frequent (low MTBF): codes with >=2 events, sorted by MTBF asc
-    const frequent = stats
-      .filter(s => s.count >= 2 && !isNaN(s.mtbfMs))
-      .sort((a,b)=>a.mtbfMs - b.mtbfMs)
+    const enriched = stats.map(s => ({
+      ...s,
+      mtbfHours: (s.count > 0 && runtimeHours > 0) ? (runtimeHours / s.count) : NaN
+    }));
+
+    // Frequent = lowest MTBF (by runtime)
+    const frequent = enriched
+      .filter(s => isFinite(s.mtbfHours))
+      .sort((a,b)=>a.mtbfHours - b.mtbfHours)
       .slice(0,3);
 
-    // Longest total downtime
-    const worstByDuration = stats
+    // Biggest total downtime
+    const worstByDuration = enriched
       .slice()
       .sort((a,b)=>b.totalMin - a.totalMin)[0];
 
     const cards = [];
 
     if (frequent.length){
-      const lines = frequent.map(s => `• Code ${s.code}: MTBF ${s.mtbfHuman} (${s.count} events, ${minutesToHM(s.totalMin)} downtime)`).join("\n");
+      const lines = frequent.map(s =>
+        `• Code ${s.code}: MTBF ${humanHours(s.mtbfHours)} (occ ${s.count}, downtime ${minutesToHM(s.totalMin)})`
+      ).join("\n");
+
       cards.push({
         severity: "Medium",
-        title: `Frequent failures — MC_01`,
-        subtitle: `Past 30 days (by Reason Code)`,
-        body: `${lines}\n\nTip: Plan a corrective maintenance targeting these high-recurrence causes (spares, alignment, settings, root-cause).`,
+        title: `Frequent failures by runtime — MC_01`,
+        subtitle: `MTBF = Σ Currentday_Runtime (last 30 days) ÷ #occurrences`,
+        body: `${lines}\n\nTip: Plan corrective maintenance targeting these high-recurrence causes.`,
         cta: { label: "Plan corrective", action: () => openModalForDate(new Date()) }
       });
     }
@@ -1325,15 +1339,24 @@ async function tipsCorrectiveTelemetry(){
     }
 
     if (!cards.length){
-      const top = stats.slice().sort((a,b)=>b.count-a.count)[0];
+      const top = enriched.slice().sort((a,b)=>b.count-a.count)[0];
       if (top){
         cards.push({
           severity: "Info",
           title: `Downtime summary — MC_01`,
-          subtitle: `Top code by count: ${top.code}`,
-          body: `Events: ${top.count}, Total downtime: ${minutesToHM(top.totalMin)}. MTBF: ${top.mtbfHuman}.`,
+          subtitle: `Window: ${start.toLocaleDateString()} → ${end.toLocaleDateString()}`,
+          body: `Top code: ${top.code}, Events: ${top.count}, Total downtime: ${minutesToHM(top.totalMin)}.` +
+                (isFinite(top.mtbfHours) ? ` MTBF: ${humanHours(top.mtbfHours)}.` : "")
         });
       }
+    }
+
+    if (!(runtimeMinutes > 0)){
+      cards.unshift({
+        severity: "Info",
+        title: "Runtime data unavailable",
+        body: "Σ Currentday_Runtime returned 0 for the last 30 days, so MTBF by runtime couldn’t be computed accurately."
+      });
     }
 
     return cards;
@@ -1372,7 +1395,7 @@ async function tipsMissed(){
   return missed;
 }
 
-/* Tip card renderer */
+/* Render helpers */
 function tipCardHTML(t){
   const sevChip = t.severity ? `<span class="chip-note">${escapeHtml(t.severity)}</span>` : "";
   const note = t.note ? `<div class="muted" style="margin-top:6px;font-size:12px">${escapeHtml(t.note)}</div>` : "";
@@ -1392,19 +1415,20 @@ function tipCardHTML(t){
   `;
 }
 
-/* Main tips renderer (coverage + corrective via telemetry + missed + info) */
+/* Main tips renderer */
 async function renderTips(){
   loading("Analysing tips…");
 
+  // base window: current month (for coverage)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try{
     const [coverageCards, correctiveCards, missedCards, runtimeCards] = await Promise.all([
-      tipsPreventiveCoverage(monthStart),   // coverage (all types)
-      tipsCorrectiveTelemetry(),           // corrective via downtime
-      tipsMissed(),                        // overdue
-      tipsPreventiveRuntime()              // info panel (runtime)
+      tipsPreventiveCoverage(monthStart),
+      tipsCorrectiveTelemetry(),
+      tipsMissed(),
+      tipsPreventiveRuntime()
     ]);
 
     // COVERAGE
@@ -1456,11 +1480,6 @@ async function renderTips(){
 
 /************ BOOT ************/
 function startCalendar(){
-  const fMachine = $("#fMachine");
-  if (fMachine && fMachine.tagName === "SELECT"){
-    fMachine.innerHTML = MACHINE_OPTIONS.map(m=>`<option>${m}</option>`).join("");
-  }
-
   if (!window.FullCalendar){
     document.getElementById('calendar').innerHTML =
       '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
@@ -1497,7 +1516,7 @@ function startCalendar(){
   });
   state.calendar.render();
 
-  // Legends on toolbar right
+  // Legends on toolbar right (calendar only)
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
