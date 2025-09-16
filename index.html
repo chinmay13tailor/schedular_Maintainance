@@ -15,8 +15,8 @@
   /* ======= LAYOUT (Header | Filters | Rail + Main + Side) ======= */
   .app{
     display:grid;
-    grid-template-columns:64px 1fr 320px;
-    grid-template-rows:auto auto 1fr;
+    grid-template-columns:64px 1fr 320px;     /* rail | main | right side */
+    grid-template-rows:auto auto 1fr;         /* header | filters | content row */
     gap:16px;
     min-height:100vh;
     padding:16px;
@@ -37,7 +37,7 @@
   }
   .filters label{font-size:12px;color:#64748b;margin-right:4px}
 
-  /* Left nav */
+  /* Left navigation rail */
   .rail{
     grid-column:1 / 2;
     grid-row:3 / 4;
@@ -52,12 +52,12 @@
   .rail button.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.15)}
   .rail button:hover{background:#f8fafc}
 
-  /* Main card */
+  /* Main area (calendar/list container) */
   .card{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden}
   #mainCard{grid-column:2 / 3;grid-row:3 / 4;min-height:560px}
   #calendar{min-height:560px}
 
-  /* Right side */
+  /* Right side details */
   .side{
     grid-column:3 / 4;grid-row:3 / 4;
     border:1px solid var(--ring);border-radius:12px;background:#fff;padding:14px;
@@ -106,7 +106,7 @@
   .legend-cancelled{background:var(--red)}
   .legend-postponed{background:var(--gray)}
 
-  /* List */
+  /* ===== List tables ===== */
   .toolbar-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--ring)}
   .table-wrap{overflow:auto;max-height:68vh}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -118,7 +118,7 @@
   .badge.completed{background:var(--green)} .badge.cancelled{background:var(--red)} .badge.postponed{background:var(--gray)}
   .chip-note{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--ring);border-radius:999px;font-size:11px;background:#f8fafc;color:#475569}
 
-  /* Tips */
+  /* ===== Tips layout ===== */
   .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px}
   .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
   .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring)}
@@ -130,7 +130,7 @@
   .tip-actions{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .tip-empty{padding:14px;color:#64748b;text-align:center;background:#f8fafc;margin:10px;border-radius:10px}
 
-  /* PDF */
+  /* ===== Info strip ===== */
   #pdfRoot{position:fixed;left:-99999px;top:-99999px;width:900px;background:#fff;color:#111827}
   .r-wrap{padding:18px;border:1px solid #e5e7eb;border-radius:14px}
   .r-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:12px}
@@ -151,9 +151,16 @@
   .sign{flex:1;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;min-height:72px}
   .r-fine{display:flex;justify-content:space-between;font-size:10px;color:#6b7280;padding:8px 2px}
 
-  /* Modal */
-  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
-  .modal{width:min(680px,92vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.28)}
+  /* Modal / Overlay */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,.45);
+    display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;
+  }
+  .modal{
+    width:min(680px,92vw);max-height:90vh;overflow:auto;
+    background:#fff;border:1px solid var(--ring);border-radius:14px;
+    box-shadow:0 24px 48px rgba(0,0,0,.28)
+  }
   .modal header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ring);padding:12px 14px;border-radius:14px 14px 0 0}
   .modal .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .modal .row-full{grid-column:1 / -1}
@@ -203,10 +210,10 @@
 
   <!-- Main area -->
   <div id="mainCard" class="card">
-    <!-- Calendar -->
+    <!-- Calendar view -->
     <div id="viewCalendar"><div id="calendar"></div></div>
 
-    <!-- List -->
+    <!-- List view -->
     <div id="viewList" style="display:none;">
       <div class="toolbar-row" id="listToolbar" style="gap:12px;">
         <div style="display:flex;gap:6px;align-items:center">
@@ -234,7 +241,7 @@
       </div>
     </div>
 
-    <!-- Tips -->
+    <!-- Tips view -->
     <div id="viewTips" style="display:none;">
       <div class="tips-grid">
         <section class="tips-col" id="tipsPrev">
@@ -251,7 +258,7 @@
         </section>
       </div>
 
-      <!-- Info strip (runtime, etc.) -->
+      <!-- Info strip (runtime etc.) -->
       <div style="padding:12px;">
         <section class="tips-col" id="tipsInfo" style="max-width:100%;">
           <h4>Info <span id="tipsInfoCount"></span></h4>
@@ -387,7 +394,7 @@ var DOWNTIME_KEYS = [
   "Downtime_Start_Time","Downtime_End_Time","Downtime_Duration","Downtime_Reason_Code"
 ];
 
-// Fixed machine options
+// Fixed machine options (for modal select)
 const MACHINE_OPTIONS = ["MC_01","MC_02","MC_03"];
 
 /************ HELPERS ************/
@@ -435,12 +442,34 @@ function humanGap(ms){
   var h = ms/3600000;  if (h>=1) return h.toFixed(1)+" h";
   var m = ms/60000;    return Math.round(m)+" m";
 }
+
+/* Robust time parsing: accepts ms, seconds (10^9…10^12), or ISO/'YYYY-MM-DD HH:mm:ss' */
+function toMs(val){
+  if (val==null || val==="") return NaN;
+  if (typeof val === "number" && isFinite(val)){
+    if (val > 1e9 && val < 1e12) return val * 1000; // seconds → ms
+    return val; // already ms (or small number)
+  }
+  const s = String(val).trim();
+  const n = Number(s);
+  if (isFinite(n)){
+    if (n > 1e9 && n < 1e12) return n * 1000; // seconds → ms
+    return n;
+  }
+  let d = Date.parse(s);
+  if (isNaN(d)) d = Date.parse(s.replace(" ", "T")); // tolerate space between date/time
+  return isNaN(d) ? NaN : d;
+}
+
+/* Prefer End-Start; fall back to literal duration (minutes or ms) */
 function normalizeDurationMinutes(val, startMs, endMs){
-  var n = Number(val)||0;
-  if (n<=0 && startMs && endMs){ return Math.max(0, (Number(endMs)-Number(startMs))/60000); }
-  // If the value looks like milliseconds, convert to minutes
-  if (n > 1440*60) return n/60000; // > 60 days in seconds => almost surely ms
-  return n; // already minutes
+  if (isFinite(startMs) && isFinite(endMs) && endMs >= startMs){
+    return (endMs - startMs)/60000; // authoritative
+  }
+  let n = Number(val);
+  if (!isFinite(n) || n <= 0) return 0;
+  if (n > 1e7) return n/60000; // looks like ms → min
+  return n; // assume minutes
 }
 
 /************ STATE ************/
@@ -507,40 +536,50 @@ function readRange(rangeStart, rangeEnd){
     });
 }
 
-/************ READ: Downtime telemetry (MC_01) ************/
+/************ READ: Downtime telemetry (MC_01) — SAME TIMESTAMP ROWS ONLY ************/
 async function readDowntimeLast30Days(){
   if(!JWT){ throw new Error("Missing JWT (?token=)"); }
   const end = new Date();
   const start = new Date(end.getTime() - 30*24*60*60*1000);
+
   const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
             + "?keys=" + encodeURIComponent(DOWNTIME_KEYS.join(","))
             + "&startTs=" + start.getTime()
             + "&endTs=" + end.getTime()
-            + "&limit=10000";
-  const res = await fetch(url, { headers:{ "X-Authorization":"Bearer "+JWT }});
-  if (!res.ok){
-    const t = await res.text(); throw new Error("Downtime read failed: "+t);
-  }
-  const obj = await res.json();
-  const recMap = {};
-  Object.keys(obj||{}).forEach(k=>{
-    (obj[k]||[]).forEach(p=>{
-      const ts = Number(p.ts);
-      const rec = recMap[ts] || (recMap[ts] = { ts });
-      rec[k] = p.value;
-    });
-  });
+            + "&limit=20000";
 
+  const res = await fetch(url, { headers:{ "X-Authorization":"Bearer "+JWT }});
+  if (!res.ok){ throw new Error("Downtime read failed: "+await res.text()); }
+  const obj = await res.json();
+
+  // Group all samples by their telemetry ts
+  const byTs = new Map();
+  for (const k of DOWNTIME_KEYS){
+    for (const p of (obj[k]||[])){
+      const ts = Number(p.ts);
+      if (!byTs.has(ts)) byTs.set(ts, { ts });
+      byTs.get(ts)[k] = p.value;
+    }
+  }
+
+  // Only use rows where Start + End + Reason exist together
   const events = [];
-  Object.keys(recMap).forEach(tsStr=>{
-    const r = recMap[tsStr];
-    const startMs = Number(r.Downtime_Start_Time || r.ts);
-    const endMs   = Number(r.Downtime_End_Time || startMs);
+  for (const [ts, r] of byTs){
+    const hasStart = r.Downtime_Start_Time != null && r.Downtime_Start_Time !== "";
+    const hasEnd   = r.Downtime_End_Time   != null && r.Downtime_End_Time   !== "";
+    const hasCode  = r.Downtime_Reason_Code!= null && r.Downtime_Reason_Code!== "";
+    if (!(hasStart && hasEnd && hasCode)) continue;
+
+    const startMs = toMs(r.Downtime_Start_Time);
+    const endMs   = toMs(r.Downtime_End_Time);
+    if (!isFinite(startMs) || !isFinite(endMs)) continue;
+
+    const code = String(r.Downtime_Reason_Code).trim();
     const durationMin = normalizeDurationMinutes(r.Downtime_Duration, startMs, endMs);
-    const code = String(r.Downtime_Reason_Code||"").trim();
-    if (!startMs || !code) return;
+
     events.push({ startMs, endMs, durationMin, code, machine:"MC_01" });
-  });
+  }
+
   events.sort((a,b)=>a.startMs-b.startMs);
   return { start, end, events };
 }
@@ -556,7 +595,6 @@ function analyzeDowntimeByCode(events){
     agg.totalMin += Math.max(0, Number(ev.durationMin)||0);
     agg.starts.push(ev.startMs);
   }
-  // compute MTBF (avg gap between consecutive start times)
   const out = [];
   for (const [code, agg] of byCode){
     agg.starts.sort((a,b)=>a-b);
@@ -625,9 +663,7 @@ function renderList(events){
       '<td>'+escapeHtml(p.MS_Technicians||"-")+'</td>'+
       '<td>'+badge(p.MS_Status)+'</td>'+
       '<td>'+escapeHtml(String(p.MS_Priority??""))+'</td>';
-    tr.addEventListener("click", function(){
-      showDetails({ extendedProps: p });
-    });
+    tr.addEventListener("click", function(){ showDetails({ extendedProps: p }); });
     tbody.appendChild(tr);
   });
   $("#listCount").textContent = "Showing "+events.length+" task(s)";
@@ -695,7 +731,7 @@ $("#navTips").addEventListener("click",     ()=>showView("tips"));
 $("#navList").addEventListener("click",     ()=>showView("list"));
 $("#navMissed").addEventListener("click",   ()=>showView("missed"));
 
-/* List month toolbar */
+/* List month toolbar buttons */
 $("#listPrev").addEventListener("click", function(){
   var d = state.listMonth ? new Date(state.listMonth) : new Date();
   d.setMonth(d.getMonth()-1); loadListMonth(d);
@@ -704,11 +740,9 @@ $("#listNext").addEventListener("click", function(){
   var d = state.listMonth ? new Date(state.listMonth) : new Date();
   d.setMonth(d.getMonth()+1); loadListMonth(d);
 });
-$("#listToday").addEventListener("click", function(){
-  loadListMonth(new Date());
-});
+$("#listToday").addEventListener("click", function(){ loadListMonth(new Date()); });
 
-/************ FILTER BUTTONS ************/
+/************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
 function refreshCalendar(){
   if (!state.calendar || !state.lastRange) return;
   var filtered = applyFilters(state.lastEventsFull);
@@ -736,7 +770,7 @@ $("#btnResetFilters").addEventListener("click", function(){
   }
 });
 
-/************ AUTO-REFRESH ************/
+/************ AUTO-REFRESH (5s, 3 min max) ************/
 var _autoTimer=null, _autoDeadline=0;
 function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
 function startAutoRefresh(expectedTs, predicate){
@@ -761,9 +795,7 @@ function startAutoRefresh(expectedTs, predicate){
         .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
       return;
     }
-    if (state.view==="tips"){
-      renderTips(); return;
-    }
+    if (state.view==="tips"){ renderTips(); return; }
     if (!state.lastRange) return;
     readRange(state.lastRange.start, state.lastRange.end)
       .then(function(events){
@@ -801,7 +833,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false;
+    body[ATTR_MS_SAVE] = false; // trigger create path
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -1006,11 +1038,12 @@ function onUpdate(){
     .finally(function(){ busy(false); });
 }
 
-/************ PDF ************/
+/************ PDF (Download) ************/
 $("#btnPDF").addEventListener("click", function(){
   if (!state.selectedEvent){ alert("Select a task first."); return; }
   generatePdf(state.selectedEvent);
 });
+
 function generatePdf(ev){
   var p = ev.extendedProps;
   var idTs = String(p.__ts || ev.start?.getTime() || Date.now());
@@ -1110,12 +1143,8 @@ function generatePdf(ev){
     <div class="r-section">
       <div class="r-sec-h">Approvals</div>
       <div class="r-foot">
-        <div class="sign">
-          <strong>Technician Sign & Date</strong>
-        </div>
-        <div class="sign">
-          <strong>Supervisor Sign & Date</strong>
-        </div>
+        <div class="sign"><strong>Technician Sign & Date</strong></div>
+        <div class="sign"><strong>Supervisor Sign & Date</strong></div>
       </div>
     </div>
 
@@ -1154,7 +1183,7 @@ function latestCompletedTsForMachine(events, mNorm){
   return latest;
 }
 
-/* Runtime helpers */
+/* Runtime helpers (MC_01 only for now) */
 function fetchDailyRuntimeMinutesForKey(dayDate, key){
   const s = startOfDay(dayDate).getTime();
   const e = endOfDay(dayDate).getTime();
@@ -1181,7 +1210,7 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
   return total;
 }
 
-/* Coverage (ANY type per your latest spec) */
+/* Coverage (ANY type per your spec) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1221,7 +1250,7 @@ async function tipsPreventiveCoverage(monthStartDate){
   return cards;
 }
 
-/* Runtime tip (shown in Info) */
+/* Runtime tip (shown in Info panel) */
 async function tipsPreventiveRuntime(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
   const events = await readRange(lookBackStart, new Date());
@@ -1247,7 +1276,7 @@ async function tipsPreventiveRuntime(){
   return [card];
 }
 
-/* NEW: Corrective tips driven by downtime telemetry (MC_01, last 30 days) */
+/* Corrective tips driven by downtime telemetry (MC_01, last 30 days) */
 async function tipsCorrectiveTelemetry(){
   try{
     const { start, end, events } = await readDowntimeLast30Days();
@@ -1261,7 +1290,7 @@ async function tipsCorrectiveTelemetry(){
     }
 
     const stats = analyzeDowntimeByCode(events);
-    // Frequent (low MTBF): pick codes with >=2 events, sorted by MTBF asc
+    // Frequent (low MTBF): codes with >=2 events, sorted by MTBF asc
     const frequent = stats
       .filter(s => s.count >= 2 && !isNaN(s.mtbfMs))
       .sort((a,b)=>a.mtbfMs - b.mtbfMs)
@@ -1295,7 +1324,6 @@ async function tipsCorrectiveTelemetry(){
       });
     }
 
-    // If neither frequent nor worst yielded a card, still return a summary
     if (!cards.length){
       const top = stats.slice().sort((a,b)=>b.count-a.count)[0];
       if (top){
@@ -1314,7 +1342,7 @@ async function tipsCorrectiveTelemetry(){
     return [{
       severity: "Info",
       title: "Corrective tips unavailable",
-      body: "We couldn't analyse downtime telemetry. Check token / CORS / device data and try again."
+      body: "We couldn't analyse downtime telemetry. Check token / device data and try again."
     }];
   }
 }
@@ -1374,9 +1402,9 @@ async function renderTips(){
   try{
     const [coverageCards, correctiveCards, missedCards, runtimeCards] = await Promise.all([
       tipsPreventiveCoverage(monthStart),   // coverage (all types)
-      tipsCorrectiveTelemetry(),           // NEW corrective via downtime
+      tipsCorrectiveTelemetry(),           // corrective via downtime
       tipsMissed(),                        // overdue
-      tipsPreventiveRuntime()              // info panel
+      tipsPreventiveRuntime()              // info panel (runtime)
     ]);
 
     // COVERAGE
