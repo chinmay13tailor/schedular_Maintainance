@@ -1113,6 +1113,7 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
 }
 
 /* Preventive coverage (current month, robust counting) */
+/* Maintenance coverage (current month, ANY type) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1121,44 +1122,44 @@ async function tipsPreventiveCoverage(monthStartDate){
   try{
     events = await readRange(s,e);
   }catch(err){
-    console.error("Preventive coverage fetch failed", err);
+    console.error("Maintenance coverage fetch failed", err);
     throw err;
   }
 
-  const byMachine = new Map(); // key = NORM
+  const byMachine = new Map(); // key = normalized machine
+  const scheduledStatuses = new Set(["planned","in-progress","completed","postponed"]);
+
   for (const ev of events){
     const p = ev.extendedProps || {};
     const mNorm = normMachine(p.MS_Machine);
     if (!mNorm) continue;
 
-    const type = String(p.MS_Type||"").trim().toLowerCase();
-    const st   = String(p.MS_Status||"").trim().toLowerCase().replace("inprogress","in-progress");
-    const isPreventive = (type === "preventive");
-    const scheduledStatuses = new Set(["planned","in-progress","completed","postponed"]);
-    const ok = scheduledStatuses.has(st);
+    const st = String(p.MS_Status||"").trim().toLowerCase().replace("inprogress","in-progress");
+    if (!scheduledStatuses.has(st)) continue; // ignore cancelled and anything else
 
-    if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, countPrev: 0 });
-
-    if (isPreventive && ok){ byMachine.get(mNorm).countPrev += 1; }
-
+    if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, count: 0 });
+    byMachine.get(mNorm).count += 1;                 // ← count ANY type
     byMachine.get(mNorm).pretty = p.MS_Machine || byMachine.get(mNorm).pretty;
   }
 
-  const MIN_PREV = 2;
+  // Minimum recommended maintenance windows (any type) per month
+  const MIN_WINDOWS = 2;
+
   const cards = [];
   for (const [mNorm, info] of byMachine){
-    if (info.countPrev < MIN_PREV){
+    if (info.count < MIN_WINDOWS){
       cards.push({
-        severity: info.countPrev===0 ? "High" : "Medium",
-        title: `Low preventive coverage — ${info.pretty}`,
-        subtitle: `This month preventive count: ${info.countPrev} (minimum recommended: ${MIN_PREV})`,
-        body: `You have scheduled ${info.countPrev||0} preventive maintenance task(s) for ${info.pretty} this month.\nTip: Add more preventive schedules to meet recommended frequency.`,
+        severity: info.count===0 ? "High" : "Medium",
+        title: `Low maintenance coverage — ${info.pretty}`,
+        subtitle: `This month maintenance windows (all types): ${info.count} (min: ${MIN_WINDOWS})`,
+        body: `We treat any maintenance visit as an opportunity to run full checks. ${info.pretty} has only ${info.count||0} this month.\nTip: add/merge another window if feasible.`,
         cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
       });
     }
   }
   return cards;
 }
+
 
 /* Runtime tip (threshold 400 hours) only for MC_01 — now rendered in "Info" */
 async function tipsPreventiveRuntime(){
