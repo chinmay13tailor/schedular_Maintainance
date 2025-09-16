@@ -481,6 +481,18 @@ function normalizeDurationMinutes(val, startMs, endMs){
   return n/60;
 }
 
+/* === New: consistent 30 complete days ending yesterday 23:59:59 === */
+function last30FullDaysRange(){
+  const now = new Date();
+  // yesterday 00:00
+  const y0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 0,0,0,0);
+  // start = 29 days before yesterday at 00:00  (=> 30 full days)
+  const start = new Date(y0.getFullYear(), y0.getMonth(), y0.getDate()-29, 0,0,0,0);
+  // end = yesterday 23:59:59.999
+  const end   = new Date(y0.getFullYear(), y0.getMonth(), y0.getDate(), 23,59,59,999);
+  return { start, end };
+}
+
 /************ STATE ************/
 var state = {
   view: "calendar",
@@ -549,8 +561,8 @@ function readRange(rangeStart, rangeEnd){
 /************ READ: Downtime telemetry (MC_01) — SAME TIMESTAMP ROWS ONLY ************/
 async function readDowntimeLast30Days(){
   if(!JWT){ throw new Error("Missing JWT (?token=)"); }
-  const end = new Date();
-  const start = new Date(end.getTime() - 30*24*60*60*1000);
+
+  const { start, end } = last30FullDaysRange();
 
   const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
             + "?keys=" + encodeURIComponent(DOWNTIME_KEYS.join(","))
@@ -574,7 +586,7 @@ async function readDowntimeLast30Days(){
 
   // Only rows with Start+End+Reason at the same ts
   const events = [];
-  for (const [ts, r] of byTs){
+  for (const [, r] of byTs){
     const hasStart = r.Downtime_Start_Time != null && r.Downtime_Start_Time !== "";
     const hasEnd   = r.Downtime_End_Time   != null && r.Downtime_End_Time   !== "";
     const hasCode  = r.Downtime_Reason_Code!= null && r.Downtime_Reason_Code!== "";
@@ -1171,7 +1183,7 @@ function generatePdf(ev){
 }
 
 /************ RUNTIME HELPERS (MC_01 only for now) ************/
-// REPLACE the old version
+/* Fast daily fetch: last sample of the day using limit=1&orderBy=DESC, with wide fallback */
 function fetchDailyRuntimeMinutesForKey(dayDate, key){
   const s = startOfDay(dayDate).getTime();
   const e = endOfDay(dayDate).getTime();
@@ -1182,8 +1194,7 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
     "&startTs=" + s +
     "&endTs=" + e;
 
-  // Fast path: fetch just the last sample of the day
-  const fast = base + "&limit=1&orderBy=DESC";
+  const fast = base + "&limit=1&orderBy=DESC"; // latest point in the day
 
   return fetch(fast, { headers:{ "X-Authorization":"Bearer "+JWT }})
     .then(res => res.ok ? res.json()
@@ -1191,11 +1202,10 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
     .then(obj => {
       const arr = (obj && obj[key]) || [];
       if (arr.length) return Number(arr[0].value) || 0; // minutes
-      // no point today – fall back to wide fetch
       throw new Error("empty day");
     })
     .catch(() => {
-      // Fallback: wider fetch then pick the latest by timestamp
+      // Fallback: get many and pick the latest by ts
       const wide = base + "&limit=5000";
       return fetch(wide, { headers:{ "X-Authorization":"Bearer "+JWT }})
         .then(res => res.ok ? res.json() : res.text().then(t=>{ throw new Error("runtime read failed: "+t); }))
@@ -1204,21 +1214,24 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
           if (!arr.length) return 0;
           let last = arr[0];
           for (const p of arr) if (Number(p.ts) > Number(last.ts)) last = p;
-          return Number(last.value) || 0; // minutes
+          return Number(last.value) || 0;
         });
     });
 }
 
-async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
+/* Sum runtime minutes between [startDay..endDay] inclusive */
+async function fetchRuntimeMinutesForMachine(mNorm, fromTs, endTs){
   if (mNorm!=="MC_01") return 0; // only MC_01 wired
   const key = "Currentday_Runtime";
+
   const start = new Date(fromTs || Date.now()); start.setHours(0,0,0,0);
-  const today = new Date(); today.setHours(0,0,0,0);
+  const endDay = new Date(endTs || Date.now()); endDay.setHours(0,0,0,0);
+
   let total = 0;
-  for (let d = new Date(start); d <= today; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1)){
+  for (let d = new Date(start); d <= endDay; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1)){
     try{ total += await fetchDailyRuntimeMinutesForKey(d, key); }catch(e){ console.warn("Runtime fetch failed", e); }
   }
-  return total;
+  return total; // minutes
 }
 
 /************ TIPS ENGINE ************/
@@ -1314,8 +1327,8 @@ async function tipsCorrectiveTelemetry(){
       }];
     }
 
-    // Total Operating Time = Σ Currentday_Runtime (minutes) for last 30 days
-    const runtimeMinutes = await fetchRuntimeMinutesForMachine("MC_01", start.getTime());
+    // Total Operating Time = Σ Currentday_Runtime (minutes) for the same window (30 full days ending yesterday)
+    const runtimeMinutes = await fetchRuntimeMinutesForMachine("MC_01", start.getTime(), end.getTime());
     const runtimeHours = runtimeMinutes / 60;
 
     const stats = analyzeDowntimeByCode(events);
@@ -1336,6 +1349,7 @@ async function tipsCorrectiveTelemetry(){
       .sort((a,b)=>b.totalMin - a.totalMin)[0];
 
     const cards = [];
+    const windowLabel = `${start.toLocaleDateString()} → ${end.toLocaleDateString()}`;
 
     if (frequent.length){
       const lines = frequent.map(s =>
@@ -1345,7 +1359,7 @@ async function tipsCorrectiveTelemetry(){
       cards.push({
         severity: "Medium",
         title: `Frequent failures by runtime — MC_01`,
-        subtitle: `MTBF = Σ Currentday_Runtime (last 30 days) ÷ #occurrences`,
+        subtitle: `MTBF = Σ Currentday_Runtime (last 30 full days, ${runtimeHours.toFixed(1)} h) ÷ #occurrences\nWindow: ${windowLabel}`,
         body: `${lines}\n\nTip: Plan corrective maintenance targeting these high-recurrence causes.`,
         cta: { label: "Plan corrective", action: () => openModalForDate(new Date()) }
       });
@@ -1355,8 +1369,8 @@ async function tipsCorrectiveTelemetry(){
       cards.push({
         severity: "High",
         title: `Biggest downtime impact — MC_01`,
-        subtitle: `Reason Code ${worstByDuration.code}`,
-        body: `Total downtime in last 30 days: ${minutesToHM(worstByDuration.totalMin)} across ${worstByDuration.count} event(s).\nFocus a corrective action to reduce time-to-recover and recurrence.`,
+        subtitle: `Window: ${windowLabel} • Reason Code ${worstByDuration.code}`,
+        body: `Total downtime in last 30 full days: ${minutesToHM(worstByDuration.totalMin)} across ${worstByDuration.count} event(s).\nFocus a corrective action to reduce time-to-recover and recurrence.`,
         cta: { label: "Add action", action: () => openModalForDate(new Date()) }
       });
     }
@@ -1367,7 +1381,7 @@ async function tipsCorrectiveTelemetry(){
         cards.push({
           severity: "Info",
           title: `Downtime summary — MC_01`,
-          subtitle: `Window: ${start.toLocaleDateString()} → ${end.toLocaleDateString()}`,
+          subtitle: `Window: ${windowLabel}`,
           body: `Top code: ${top.code}, Events: ${top.count}, Total downtime: ${minutesToHM(top.totalMin)}.` +
                 (isFinite(top.mtbfHours) ? ` MTBF: ${humanHours(top.mtbfHours)}.` : "")
         });
@@ -1378,7 +1392,7 @@ async function tipsCorrectiveTelemetry(){
       cards.unshift({
         severity: "Info",
         title: "Runtime data unavailable",
-        body: "Σ Currentday_Runtime returned 0 for the last 30 days, so MTBF by runtime couldn’t be computed accurately."
+        body: "Σ Currentday_Runtime returned 0 in the window, so MTBF by runtime couldn’t be computed accurately."
       });
     }
 
@@ -1428,7 +1442,7 @@ function tipCardHTML(t){
         <div class="tip-title">${escapeHtml(t.title)}</div>
         ${sevChip}
       </div>
-      ${ t.subtitle ? `<div class="muted" style="font-size:12px;margin:2px 0 8px">${escapeHtml(t.subtitle)}</div>` : "" }
+      ${ t.subtitle ? `<div class="muted" style="font-size:12px;margin:2px 0 8px;white-space:pre-line">${escapeHtml(t.subtitle)}</div>` : "" }
       <div class="tip-body">${escapeHtml(t.body||"")}</div>
       ${note}
       <div class="tip-actions">
