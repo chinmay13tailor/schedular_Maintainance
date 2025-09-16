@@ -1116,13 +1116,19 @@ async function tipsPreventiveCoverage(monthStartDate){
     const p = ev.extendedProps || {};
     const mNorm = normMachine(p.MS_Machine);
     if (!mNorm) continue;
+
+    // Normalize and be lenient
+    const type = String(p.MS_Type||"").trim().toLowerCase();
+    const st   = String(p.MS_Status||"").trim().toLowerCase().replace("inprogress","in-progress");
+    const isPreventive = (type === "preventive");
+    const scheduledStatuses = new Set(["planned","in-progress","completed","postponed"]); // count these
+    const ok = scheduledStatuses.has(st);
+
     if (!byMachine.has(mNorm)) byMachine.set(mNorm, { pretty: p.MS_Machine, countPrev: 0 });
 
-    const isPreventive = String(p.MS_Type||"").toLowerCase()==="preventive";
-    const st = String(p.MS_Status||"").toLowerCase();
-    const ok = (st==="planned" || st==="completed");
     if (isPreventive && ok){ byMachine.get(mNorm).countPrev += 1; }
 
+    // keep last pretty seen
     byMachine.get(mNorm).pretty = p.MS_Machine || byMachine.get(mNorm).pretty;
   }
 
@@ -1134,13 +1140,14 @@ async function tipsPreventiveCoverage(monthStartDate){
         severity: info.countPrev===0 ? "High" : "Medium",
         title: `Low preventive coverage — ${info.pretty}`,
         subtitle: `This month preventive count: ${info.countPrev} (minimum recommended: ${MIN_PREV})`,
-        body: `You have scheduled only ${info.countPrev||0} preventive maintenance for ${info.pretty} this month.\nTip: Add more preventive schedules to meet recommended frequency.`,
+        body: `You have scheduled ${info.countPrev||0} preventive maintenance task(s) for ${info.pretty} this month.\nTip: Add more preventive schedules to meet recommended frequency.`,
         cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
       });
     }
   }
   return cards;
 }
+
 
 /* Runtime tip (threshold 400 hours) only for MC_01 */
 async function tipsPreventiveRuntime(){
@@ -1247,26 +1254,23 @@ function tipCardHTML(t){
 async function renderTips(){
   loading("Analysing tips…");
 
-  // base window: current month (for coverage/corrective)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try{
     const [coverageCards, runtimeCards, correctiveCards, missedCards] = await Promise.all([
       tipsPreventiveCoverage(monthStart),
-      tipsPreventiveRuntime(),
+      tipsPreventiveRuntime(),      // we'll render these in Info
       tipsCorrective(monthStart),
       tipsMissed()
     ]);
 
-    // PREVENTIVE
+    // ===== PREVENTIVE =====
     const prevBody = $("#tipsPrevBody");
-    prevBody.innerHTML = "";
-    const prevCards = [...coverageCards];
-    if (runtimeCards && runtimeCards.length){ prevCards.push(runtimeCards[0]); }
+    const prevCards = [...coverageCards]; // runtime no longer pushed here
     if (!prevCards.length){
       prevBody.innerHTML = `<div class="tip-empty">No preventive suggestions.</div>`;
-    }else{
+    } else {
       prevBody.innerHTML = prevCards.map(t => tipCardHTML(t)).join("");
       prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
         btn.addEventListener("click", ()=>openModalForDate(new Date()));
@@ -1274,7 +1278,7 @@ async function renderTips(){
     }
     $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
 
-    // CORRECTIVE
+    // ===== CORRECTIVE =====
     const corrBody = $("#tipsCorrBody");
     if (!correctiveCards.length){
       corrBody.innerHTML = `<div class="tip-empty">No corrective suggestions.</div>`;
@@ -1287,7 +1291,7 @@ async function renderTips(){
       $("#tipsCorrCount").textContent = `(${correctiveCards.length})`;
     }
 
-    // MISSED
+    // ===== MISSED =====
     const missBody = $("#tipsMissBody");
     if (!missedCards.length){
       missBody.innerHTML = `<div class="tip-empty">No missed items detected.</div>`;
@@ -1300,15 +1304,31 @@ async function renderTips(){
       $("#tipsMissCount").textContent = `(${missedCards.length})`;
     }
 
+    // ===== INFO (runtime etc.) =====
+    const infoBody = $("#tipsInfoBody");
+    const infoCards = runtimeCards || [];
+    if (!infoCards.length){
+      infoBody.innerHTML = `<div class="tip-empty">No additional info.</div>`;
+      $("#tipsInfoCount").textContent = "";
+    } else {
+      infoBody.innerHTML = infoCards.map(t=>tipCardHTML(t)).join("");
+      infoBody.querySelectorAll(".tip-card .btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>openModalForDate(new Date()));
+      });
+      $("#tipsInfoCount").textContent = `(${infoCards.length})`;
+    }
+
     loading("Tips ready");
   }catch(e){
     console.error(e);
     $("#tipsPrevBody").innerHTML = `<div class="tip-empty">Failed to generate tips.</div>`;
     $("#tipsCorrBody").innerHTML = `<div class="tip-empty">—</div>`;
     $("#tipsMissBody").innerHTML = `<div class="tip-empty">—</div>`;
+    $("#tipsInfoBody").innerHTML = `<div class="tip-empty">—</div>`;
     loading("Tips error");
   }
 }
+
 
 /************ BOOT ************/
 function startCalendar(){
