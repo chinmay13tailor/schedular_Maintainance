@@ -1335,7 +1335,7 @@ async function tipsPreventiveRuntime(){
     title: `Runtime monitor — ${pretty}`,
     subtitle: `Runtime since last maintenance: ${totalHours.toFixed(1)} hrs`,
     body: `Machine ${pretty} has run ${totalHours.toFixed(1)} hrs since last maintenance.\nStatus: ${statusTxt}.`,
-    note: `Measured from last completed maintenance; daily key: Currentday_Runtime`,
+    note: `Measured from last completed maintenance;`,
     cta: { label: "Schedule", action: () => openModalForDate(new Date()) }
   };
 
@@ -1382,7 +1382,7 @@ async function tipsCorrectiveTelemetry(){
       cards.push({
         severity: "Medium",
         title: `Frequent failures by runtime — MC_01`,
-        subtitle: `MTBF = Σ Currentday_Runtime (last 30 full days, ${runtimeHours.toFixed(1)} h) ÷ #occurrences\nWindow: ${windowLabel}`,
+        subtitle: `MTBF = Σ Currentday_Runtime (last 30 full days) ÷ occurrences`,
         body: `${lines}\n\nTip: Plan corrective maintenance targeting these high-recurrence causes.`,
         cta: { label: "Plan corrective", action: () => openModalForDate(new Date()) }
       });
