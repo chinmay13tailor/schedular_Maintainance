@@ -121,8 +121,42 @@
   /* ===== Tips layout ===== */
   .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px}
   .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
-  .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring)}
-  .tips-col h4 span{font-weight:700;color:#64748b;font-size:12px;margin-left:8px}
+
+  /* Base h4 style */
+  .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring);text-align:center}
+
+  /* Count chip inside colored headers (overrides below) */
+  .tips-col h4 span{
+    display:inline-block;
+    margin-left:8px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:rgba(255,255,255,.22);
+    color:inherit;
+    font-weight:700;
+    font-size:12px
+  }
+
+  /* === Color-coded Tips headers === */
+  /* Preventive / Coverage = Blue */
+  #tipsPrev > h4{
+    background:var(--blue);
+    color:#ffffff;
+    border-bottom:0;
+  }
+  /* Corrective = Amber/Yellow (dark text for contrast) */
+  #tipsCorr > h4{
+    background:var(--amber);
+    color:#111827;
+    border-bottom:0;
+  }
+  /* Missed = Red */
+  #tipsMiss > h4{
+    background:var(--red);
+    color:#ffffff;
+    border-bottom:0;
+  }
+
   .tip-card{border-bottom:1px solid var(--ring);padding:12px}
   .tip-card:last-child{border-bottom:0}
   .tip-title{font-weight:900;margin-bottom:6px}
@@ -475,20 +509,15 @@ function normalizeDurationMinutes(val, startMs, endMs){
   }
   let n = Number(val);
   if (!isFinite(n) || n <= 0) return 0;
-  // If it looks like milliseconds (very large), convert ms→min
-  if (n > 1e7) return n/60000;
-  // Otherwise treat as SECONDS (per your data) → minutes
-  return n/60;
+  if (n > 1e7) return n/60000; // ms -> min
+  return n/60;                 // seconds -> min
 }
 
 /* === New: consistent 30 complete days ending yesterday 23:59:59 === */
 function last30FullDaysRange(){
   const now = new Date();
-  // yesterday 00:00
   const y0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 0,0,0,0);
-  // start = 29 days before yesterday at 00:00  (=> 30 full days)
   const start = new Date(y0.getFullYear(), y0.getMonth(), y0.getDate()-29, 0,0,0,0);
-  // end = yesterday 23:59:59.999
   const end   = new Date(y0.getFullYear(), y0.getMonth(), y0.getDate(), 23,59,59,999);
   return { start, end };
 }
@@ -1205,7 +1234,6 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
       throw new Error("empty day");
     })
     .catch(() => {
-      // Fallback: get many and pick the latest by ts
       const wide = base + "&limit=5000";
       return fetch(wide, { headers:{ "X-Authorization":"Bearer "+JWT }})
         .then(res => res.ok ? res.json() : res.text().then(t=>{ throw new Error("runtime read failed: "+t); }))
@@ -1327,7 +1355,6 @@ async function tipsCorrectiveTelemetry(){
       }];
     }
 
-    // Total Operating Time = Σ Currentday_Runtime (minutes) for the same window (30 full days ending yesterday)
     const runtimeMinutes = await fetchRuntimeMinutesForMachine("MC_01", start.getTime(), end.getTime());
     const runtimeHours = runtimeMinutes / 60;
 
@@ -1337,16 +1364,12 @@ async function tipsCorrectiveTelemetry(){
       mtbfHours: (s.count > 0 && runtimeHours > 0) ? (runtimeHours / s.count) : NaN
     }));
 
-    // Frequent = lowest MTBF (by runtime)
     const frequent = enriched
       .filter(s => isFinite(s.mtbfHours))
       .sort((a,b)=>a.mtbfHours - b.mtbfHours)
       .slice(0,3);
 
-    // Biggest total downtime
-    const worstByDuration = enriched
-      .slice()
-      .sort((a,b)=>b.totalMin - a.totalMin)[0];
+    const worstByDuration = enriched.slice().sort((a,b)=>b.totalMin - a.totalMin)[0];
 
     const cards = [];
     const windowLabel = `${start.toLocaleDateString()} → ${end.toLocaleDateString()}`;
@@ -1456,7 +1479,6 @@ function tipCardHTML(t){
 async function renderTips(){
   loading("Analysing tips…");
 
-  // base window: current month (for coverage)
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -1553,7 +1575,6 @@ function startCalendar(){
   });
   state.calendar.render();
 
-  // Legends on toolbar right (calendar only)
   const toolbar = calEl.querySelector(".fc-toolbar-chunk:nth-child(3)");
   if (toolbar){
     const legends = document.createElement("div");
