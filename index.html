@@ -1171,21 +1171,44 @@ function generatePdf(ev){
 }
 
 /************ RUNTIME HELPERS (MC_01 only for now) ************/
+// REPLACE the old version
 function fetchDailyRuntimeMinutesForKey(dayDate, key){
   const s = startOfDay(dayDate).getTime();
   const e = endOfDay(dayDate).getTime();
-  const url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
-            + "?keys="+encodeURIComponent(key)
-            + "&startTs="+s+"&endTs="+e+"&limit=500";
-  return fetch(url, { headers:{ "X-Authorization":"Bearer "+JWT }})
-    .then(res=> res.ok ? res.json() : res.text().then(t=>{ throw new Error("Runtime read failed: "+t); }))
-    .then(obj=>{
+
+  const base =
+    API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries" +
+    "?keys=" + encodeURIComponent(key) +
+    "&startTs=" + s +
+    "&endTs=" + e;
+
+  // Fast path: fetch just the last sample of the day
+  const fast = base + "&limit=1&orderBy=DESC";
+
+  return fetch(fast, { headers:{ "X-Authorization":"Bearer "+JWT }})
+    .then(res => res.ok ? res.json()
+                        : Promise.reject(new Error("fast runtime read failed")))
+    .then(obj => {
       const arr = (obj && obj[key]) || [];
-      if (!arr.length) return 0;
-      // last point's value is the total minutes for that day
-      return Number(arr[arr.length-1].value)||0;
+      if (arr.length) return Number(arr[0].value) || 0; // minutes
+      // no point today – fall back to wide fetch
+      throw new Error("empty day");
+    })
+    .catch(() => {
+      // Fallback: wider fetch then pick the latest by timestamp
+      const wide = base + "&limit=5000";
+      return fetch(wide, { headers:{ "X-Authorization":"Bearer "+JWT }})
+        .then(res => res.ok ? res.json() : res.text().then(t=>{ throw new Error("runtime read failed: "+t); }))
+        .then(obj => {
+          const arr = (obj && obj[key]) || [];
+          if (!arr.length) return 0;
+          let last = arr[0];
+          for (const p of arr) if (Number(p.ts) > Number(last.ts)) last = p;
+          return Number(last.value) || 0; // minutes
+        });
     });
 }
+
 async function fetchRuntimeMinutesForMachine(mNorm, fromTs){
   if (mNorm!=="MC_01") return 0; // only MC_01 wired
   const key = "Currentday_Runtime";
