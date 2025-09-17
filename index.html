@@ -122,22 +122,10 @@
   .tips-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:12px}
   .tips-col{border:1px solid var(--ring);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
 
-  /* Base h4 style */
   .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring);text-align:center}
-
-  /* Count chip inside colored headers */
   .tips-col h4 span{
-    display:inline-block;
-    margin-left:8px;
-    padding:2px 8px;
-    border-radius:999px;
-    background:rgba(255,255,255,.22);
-    color:inherit;
-    font-weight:700;
-    font-size:12px
+    display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.22);color:inherit;font-weight:700;font-size:12px
   }
-
-  /* === Color-coded Tips headers === */
   #tipsPrev > h4{ background:var(--blue);  color:#fff;     border-bottom:0; }
   #tipsCorr > h4{ background:var(--amber); color:#111827;  border-bottom:0; }
   #tipsMiss > h4{ background:var(--red);   color:#fff;     border-bottom:0; }
@@ -294,7 +282,7 @@
       </div>
     </div>
 
-    <!-- Missed placeholder -->
+    <!-- Missed placeholder (kept) -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -370,7 +358,7 @@
         <div id="techChips" class="chips"></div>
       </div>
 
-      <!-- NEW: checklist chips (stored as comma-separated MS_Task) -->
+      <!-- Checklist chips (stored as comma-separated MS_Task) -->
       <div class="row-full">
         <label>Checklist points <span class="muted">(stored in MS_Task)</span></label>
         <div style="display:flex;gap:8px;align-items:center">
@@ -480,12 +468,12 @@ function toMs(val){
   if (val==null || val==="") return NaN;
   if (typeof val === "number" && isFinite(val)){
     if (val > 1e9 && val < 1e12) return val * 1000; // seconds → ms
-    return val; // already ms (or small number that could be ms)
+    return val;
   }
   const s = String(val).trim();
   const n = Number(s);
   if (isFinite(n)){
-    if (n > 1e9 && n < 1e12) return n * 1000; // seconds → ms
+    if (n > 1e9 && n < 1e12) return n * 1000;
     return n;
   }
   let d = Date.parse(s);
@@ -519,7 +507,7 @@ var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
-  taskItems: [],                 // <— NEW for checklist chips
+  taskItems: [],                 // checklist items
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
   listMonth: null,
@@ -802,37 +790,51 @@ $("#btnResetFilters").addEventListener("click", function(){
 /************ AUTO-REFRESH (5s, 3 min max) ************/
 var _autoTimer=null, _autoDeadline=0;
 function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
-/* Added opts.stopOnce to refresh once (creation) */
-function startAutoRefresh(expectedTs, predicate, opts){
+
+/* Enhanced: supports
+   - expectedTs + predicate(foundEvent)  (updates)
+   - predicate(eventsArray) when expectedTs is null (creates)
+*/
+function startAutoRefresh(expectedTs, predicate){
   stopAutoRefresh();
-  const stopOnce = !!(opts && opts.stopOnce);
   _autoDeadline = Date.now() + 3*60*1000;
   _autoTimer = setInterval(function(){
-    if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped polling"); return; }
+    if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped: timeout waiting for telemetry update"); return; }
 
     const runFetch = (range) => readRange(range.start, range.end)
       .then(function(events){
         state.lastEventsFull = events.slice();
         populateFilters(events);
+
         if (state.view==="list" && state.lastListRange){
           renderList(applyFilters(events));
-        }else{
+        } else {
           refreshCalendar();
           $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
         }
-        if (stopOnce){ stopAutoRefresh(); loading("Synced ✓"); return; }
-        if (expectedTs!=null){
-          var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
-          if (found){
-            if (typeof predicate==="function"){ try{ if(predicate(found)){ stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){} }
-            else { stopAutoRefresh(); loading("Update detected ✓"); }
+
+        // Match modes
+        if (typeof predicate === "function"){
+          if (expectedTs == null){
+            // creation mode: predicate checks the full events array
+            try{ if (predicate(events)) { stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){}
+          } else {
+            // update mode: wait for the specific ts row, then validate
+            var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
+            if (found){
+              try{ if (predicate(found)) { stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){}
+            }
           }
+        } else if (expectedTs != null){
+          // simple existence check by ts
+          var f = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
+          if (f){ stopAutoRefresh(); loading("Update detected ✓"); }
         }
       })
       .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
 
-    if (state.view==="list" && state.lastListRange) runFetch(state.lastListRange);
-    else if (state.lastRange) runFetch(state.lastRange);
+    if (state.view==="list" && state.lastListRange)      runFetch(state.lastListRange);
+    else if (state.lastRange)                             runFetch(state.lastRange);
   }, 5000);
 }
 
@@ -854,7 +856,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false;
+    body[ATTR_MS_SAVE] = false; // trigger create path
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -1037,32 +1039,20 @@ function validatePayload(p){
   return "";
 }
 
-/* Draw immediately on calendar after successful save */
-function optimisticAdd(payload){
-  try{
-    if (!state.calendar) return;
-    const ev = {
-      title: payload.MS_Title || "Maintenance",
-      start: new Date(payload.MS_Start),
-      end:   new Date(payload.MS_End),
-      classNames: ["event", colorByStatus(payload.MS_Status)],
-      extendedProps: {
-        MS_Title: payload.MS_Title || "",
-        MS_Machine: payload.MS_Machine || "",
-        MS_Type: payload.MS_Type || "Preventive",
-        MS_Priority: payload.MS_Priority != null ? payload.MS_Priority : 3,
-        MS_Date: payload.MS_Date || null,
-        MS_Start: payload.MS_Start,
-        MS_End: payload.MS_End,
-        MS_Status: payload.MS_Status || "Planned",
-        MS_Description: payload.MS_Description || "",
-        MS_Technicians: payload.MS_Technicians || "",
-        MS_Task: payload.MS_Task || "",
-        __ts: "optimistic"
-      }
-    };
-    state.calendar.addEvent(ev);
-  }catch(e){ console.warn("optimistic add failed", e); }
+/* Match an event in DB to the just-saved payload */
+function eventMatchesPayload(ev, payload){
+  var p = ev.extendedProps || {};
+  return (
+    normMachine(p.MS_Machine) === String(payload.MS_Machine) &&
+    String(p.MS_Title||"")   === String(payload.MS_Title||"") &&
+    String(p.MS_Type||"")    === String(payload.MS_Type||"") &&
+    String(p.MS_Status||"")  === String(payload.MS_Status||"") &&
+    String(p.MS_Priority)    === String(payload.MS_Priority) &&
+    Number(p.MS_Start||0)    === Number(payload.MS_Start||-1) &&
+    Number(p.MS_End||0)      === Number(payload.MS_End||-1) &&
+    String(p.MS_Technicians||"") === String(payload.MS_Technicians||"") &&
+    String(p.MS_Task||"")         === String(payload.MS_Task||"")
+  );
 }
 
 function onCreate(){
@@ -1072,9 +1062,11 @@ function onCreate(){
   writeAttributes(payload, { mode:"create" })
     .then(function(){
       closeOverlay();
-      optimisticAdd(payload);                 // show immediately
-      loading("Saved ✓ Syncing…");
-      startAutoRefresh(null, null, {stopOnce:true});   // one fetch then stop
+      // Start polling every 5s (3 min cap) until the new row appears in DB,
+      // then it will be drawn by refreshCalendar and polling stops.
+      startAutoRefresh(null, function(events){
+        return Array.isArray(events) && events.some(ev => eventMatchesPayload(ev, payload));
+      });
     })
     .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
     .finally(function(){ busy(false); });
