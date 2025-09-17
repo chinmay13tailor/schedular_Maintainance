@@ -125,7 +125,7 @@
   /* Base h4 style */
   .tips-col h4{margin:0;padding:10px 12px;font-weight:900;border-bottom:1px solid var(--ring);text-align:center}
 
-  /* Count chip inside colored headers (overrides below) */
+  /* Count chip inside colored headers */
   .tips-col h4 span{
     display:inline-block;
     margin-left:8px;
@@ -149,9 +149,12 @@
   .tip-actions{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .tip-empty{padding:14px;color:#64748b;text-align:center;background:#f8fafc;margin:10px;border-radius:10px}
 
-  /* Tips loading spinner */
-  .loading-block{padding:12px;display:flex;align-items:center;gap:8px;color:#64748b}
-  .spinner{width:16px;height:16px;border:2px solid #cbd5e1;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+  /* Tips loader */
+  .tips-loading{display:flex;align-items:center;justify-content:center;padding:28px;color:#64748b}
+  .tips-loading::after{
+    content:""; width:16px;height:16px; margin-left:10px; border-radius:50%;
+    border:2px solid #cbd5e1;border-top-color:#64748b; animation:spin 0.8s linear infinite;
+  }
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* ===== PDF styles ===== */
@@ -291,7 +294,7 @@
       </div>
     </div>
 
-    <!-- Missed placeholder (kept) -->
+    <!-- Missed placeholder -->
     <div id="viewMissed" style="display:none;padding:18px;">
       <div class="empty">Missed view coming soon.</div>
     </div>
@@ -367,11 +370,11 @@
         <div id="techChips" class="chips"></div>
       </div>
 
-      <!-- Checklist chips (replaces textarea) -->
+      <!-- NEW: checklist chips (stored as comma-separated MS_Task) -->
       <div class="row-full">
         <label>Checklist points <span class="muted">(stored in MS_Task)</span></label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="taskOne" class="input" type="text" placeholder="Type a checkpoint and click + or press Enter">
+          <input id="taskOne" class="input" type="text" placeholder="Type a checkpoint and press + or Enter">
           <button class="btn ghost" id="addTaskBtn" type="button">+</button>
         </div>
         <div id="taskChips" class="chips"></div>
@@ -471,12 +474,6 @@ function humanHours(h){
   }
   return `${h.toFixed(1)} h`;
 }
-function humanGap(ms){
-  if (!isFinite(ms) || ms<=0) return "—";
-  var d = ms/86400000; if (d>=1) return d.toFixed(1)+" d";
-  var h = ms/3600000;  if (h>=1) return h.toFixed(1)+" h";
-  var m = ms/60000;    return Math.round(m)+" m";
-}
 
 /* Robust time parsing: accepts ms, seconds, or ISO */
 function toMs(val){
@@ -496,18 +493,18 @@ function toMs(val){
   return isNaN(d) ? NaN : d;
 }
 
-/* Duration is logged in SECONDS. Prefer End-Start; fallback to value (sec→min or ms→min). */
+/* Duration (sec) → minutes; prefer End-Start when both present */
 function normalizeDurationMinutes(val, startMs, endMs){
   if (isFinite(startMs) && isFinite(endMs) && endMs >= startMs){
-    return (endMs - startMs)/60000; // authoritative from timestamps
+    return (endMs - startMs)/60000;
   }
   let n = Number(val);
   if (!isFinite(n) || n <= 0) return 0;
-  if (n > 1e7) return n/60000; // ms -> min
-  return n/60;                 // seconds -> min
+  if (n > 1e7) return n/60000; // looks like ms
+  return n/60;                 // seconds → minutes
 }
 
-/* === 30 complete days ending yesterday 23:59:59 === */
+/* === Consistent 30 complete days ending yesterday 23:59:59 === */
 function last30FullDaysRange(){
   const now = new Date();
   const y0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()-1, 0,0,0,0);
@@ -522,15 +519,14 @@ var state = {
   calendar:null, lastRange:null, selectedEvent:null, mode:"create",
   pickedDate: null,
   technicians: [],
-  tasks: [],                     // <-- NEW: checklist chips storage
+  taskItems: [],                 // <— NEW for checklist chips
   filters: { ma:"__ALL__", ty:"__ALL__", st:"__ALL__", tech:"__ALL__" },
   lastEventsFull: [],
-  listMonth: null,          // Date pointing to the visible month in List View
+  listMonth: null,
   lastListRange: null
 };
 
 /************ READ ************/
-/* Read scheduler events */
 function readRange(rangeStart, rangeEnd){
   if(!JWT){ return Promise.reject(new Error("Missing JWT (?token=)")); }
   var url = API_BASE + "/plugins/telemetry/DEVICE/" + DEVICE_ID + "/values/timeseries"
@@ -582,7 +578,7 @@ function readRange(rangeStart, rangeEnd){
     });
 }
 
-/************ READ: Downtime telemetry (MC_01) — SAME TIMESTAMP ROWS ONLY ************/
+/************ READ: Downtime telemetry (MC_01) ************/
 async function readDowntimeLast30Days(){
   if(!JWT){ throw new Error("Missing JWT (?token=)"); }
 
@@ -598,7 +594,6 @@ async function readDowntimeLast30Days(){
   if (!res.ok){ throw new Error("Downtime read failed: "+await res.text()); }
   const obj = await res.json();
 
-  // Group samples by telemetry ts
   const byTs = new Map();
   for (const k of DOWNTIME_KEYS){
     for (const p of (obj[k]||[])){
@@ -608,7 +603,6 @@ async function readDowntimeLast30Days(){
     }
   }
 
-  // Only rows with Start+End+Reason at the same ts
   const events = [];
   for (const [, r] of byTs){
     const hasStart = r.Downtime_Start_Time != null && r.Downtime_Start_Time !== "";
@@ -630,7 +624,7 @@ async function readDowntimeLast30Days(){
   return { start, end, events };
 }
 
-/* Group by reason: count and total downtime minutes */
+/* Group by reason */
 function analyzeDowntimeByCode(events){
   const byCode = new Map();
   for (const ev of events){
@@ -752,6 +746,10 @@ function showView(name){
   } else if (name==="calendar"){
     refreshCalendar();
   } else if (name==="tips"){
+    // show temporary loader while tips compute
+    ["#tipsPrevBody","#tipsCorrBody","#tipsMissBody","#tipsInfoBody"].forEach(sel=>{
+      const el = document.querySelector(sel); if(el) el.innerHTML = '<div class="tips-loading">Analysing the data</div>';
+    });
     renderTips().catch(e=>console.error(e));
   } else {
     loading("");
@@ -773,7 +771,7 @@ $("#listNext").addEventListener("click", function(){
 });
 $("#listToday").addEventListener("click", function(){ loadListMonth(new Date()); });
 
-/************ FILTER BUTTONS HOOKED TO CURRENT VIEW ************/
+/************ FILTER BUTTONS ************/
 function refreshCalendar(){
   if (!state.calendar || !state.lastRange) return;
   var filtered = applyFilters(state.lastEventsFull);
@@ -784,7 +782,7 @@ $("#btnApplyFilters").addEventListener("click", function(){
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
   } else if (state.view==="tips"){
-    renderTips();
+    showView("tips"); // re-show loader then render
   } else {
     refreshCalendar();
   }
@@ -795,94 +793,46 @@ $("#btnResetFilters").addEventListener("click", function(){
   if (state.view==="list"){
     if (state.listMonth) loadListMonth(state.listMonth);
   } else if (state.view==="tips"){
-    renderTips();
+    showView("tips");
   } else {
     refreshCalendar();
   }
 });
 
-/************ AUTO-REFRESH (5s, 3 min max) — UPDATED ************/
-var _autoTimer=null, _autoDeadline=0, _autoInitialCount=null, _autoExpect=null;
-function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } _autoExpect=null; _autoInitialCount=null; }
-
-function startAutoRefresh(expected, predicate){
+/************ AUTO-REFRESH (5s, 3 min max) ************/
+var _autoTimer=null, _autoDeadline=0;
+function stopAutoRefresh(){ if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; } }
+/* Added opts.stopOnce to refresh once (creation) */
+function startAutoRefresh(expectedTs, predicate, opts){
   stopAutoRefresh();
+  const stopOnce = !!(opts && opts.stopOnce);
   _autoDeadline = Date.now() + 3*60*1000;
-  _autoInitialCount = (state.lastEventsFull || []).length;
-  _autoExpect = expected || null;
-
-  function createdEventAppeared(evList){
-    if (!_autoExpect) return false;
-
-    // Update/Cancel path (expected is base __ts number)
-    if (typeof _autoExpect === "number"){
-      const found = evList.find(ev => String(ev.extendedProps.__ts) === String(_autoExpect));
-      return !!found;
-    }
-    // Create path (expected is object with start/title/machine)
-    const startExp = Number(_autoExpect.start||0);
-    const titleExp = String(_autoExpect.title||"").trim();
-    const machExp  = String(_autoExpect.machine||"").trim().toUpperCase();
-
-    return evList.some(ev => {
-      const p = ev.extendedProps||{};
-      return Number(p.MS_Start) === startExp &&
-             normMachine(p.MS_Machine) === machExp &&
-             String(p.MS_Title||"").trim() === titleExp;
-    });
-  }
-
-  function syncCurrentView(events){
-    state.lastEventsFull = events.slice();
-    populateFilters(events);
-    if (state.view==="list" && state.lastListRange){
-      renderList(applyFilters(events));
-    } else if (state.view==="tips"){
-      renderTips();
-    } else {
-      refreshCalendar();
-      $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
-    }
-  }
-
   _autoTimer = setInterval(function(){
-    if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped: timeout waiting for telemetry update"); return; }
+    if (Date.now()>_autoDeadline){ stopAutoRefresh(); loading("Stopped polling"); return; }
 
-    const range = (state.view==="list" && state.lastListRange) ? state.lastListRange : state.lastRange;
-    if (!range) return;
-
-    readRange(range.start, range.end)
+    const runFetch = (range) => readRange(range.start, range.end)
       .then(function(events){
-        // Always refresh UI first
-        syncCurrentView(events);
-
-        // Explicit predicate (update/cancel flow)
-        if (typeof predicate==="function"){
-          const found = (_autoExpect!=null && typeof _autoExpect === "number")
-            ? events.find(ev => String(ev.extendedProps.__ts) === String(_autoExpect))
-            : null;
-          if (found && predicate(found)){
-            loading("Update detected ✓");
-            stopAutoRefresh();
-            return;
+        state.lastEventsFull = events.slice();
+        populateFilters(events);
+        if (state.view==="list" && state.lastListRange){
+          renderList(applyFilters(events));
+        }else{
+          refreshCalendar();
+          $("#details").className="empty"; $("#details").textContent="Select a task"; $("#sideActions").style.display="none";
+        }
+        if (stopOnce){ stopAutoRefresh(); loading("Synced ✓"); return; }
+        if (expectedTs!=null){
+          var found = events.find(ev => String(ev.extendedProps.__ts) === String(expectedTs));
+          if (found){
+            if (typeof predicate==="function"){ try{ if(predicate(found)){ stopAutoRefresh(); loading("Update detected ✓"); } }catch(e){} }
+            else { stopAutoRefresh(); loading("Update detected ✓"); }
           }
-        }
-
-        // Created event appeared
-        if (createdEventAppeared(events)){
-          loading("Saved ✓");
-          stopAutoRefresh();
-          return;
-        }
-
-        // Fallback: count increased
-        if (_autoInitialCount!=null && events.length > _autoInitialCount){
-          loading("Saved ✓");
-          stopAutoRefresh();
-          return;
         }
       })
       .catch(function(err){ console.error(err); loading("Auto-refresh error: "+(err.message||err)); });
+
+    if (state.view==="list" && state.lastListRange) runFetch(state.lastListRange);
+    else if (state.lastRange) runFetch(state.lastRange);
   }, 5000);
 }
 
@@ -904,7 +854,7 @@ function writeAttributes(payload, opts){
     MS_Task: payload.MS_Task || ""
   };
   if (opts && opts.mode==="create"){
-    body[ATTR_MS_SAVE] = false; // trigger create path
+    body[ATTR_MS_SAVE] = false;
   } else if (opts && (opts.mode==="update" || opts.mode==="cancel")){
     body[ATTR_MS_UPDATE] = true;
     if (payload[ATTR_MS_UPD_TS]) body[ATTR_MS_UPD_TS] = payload[ATTR_MS_UPD_TS];
@@ -943,6 +893,8 @@ var overlay = $("#overlay");
 function busy(on){
   ["saveTask","btnCancel","btnEdit","btnNew","btnPDF"].forEach(id=>{ var el=$("#"+id); if(el) el.disabled=!!on; });
 }
+
+/* Technicians */
 function refreshTechChips(){
   var box=$("#techChips"); box.innerHTML="";
   state.technicians.forEach(function(name, idx){
@@ -960,27 +912,22 @@ function addOneTech(){
 $("#addTechBtn").addEventListener("click", addOneTech);
 $("#techOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTech(); } });
 
-/* === Task chips (NEW) === */
+/* Checklist items as chips */
 function refreshTaskChips(){
   var box=$("#taskChips"); box.innerHTML="";
-  state.tasks.forEach(function(txt, idx){
+  state.taskItems.forEach(function(text, idx){
     var chip=document.createElement("span"); chip.className="chip";
-    chip.innerHTML='<span>'+escapeHtml(txt)+'</span><button type="button" aria-label="Remove">✕</button>';
-    chip.querySelector("button").addEventListener("click", function(){ state.tasks.splice(idx,1); refreshTaskChips(); });
+    chip.innerHTML='<span>'+escapeHtml(text)+'</span><button type="button" aria-label="Remove">✕</button>';
+    chip.querySelector("button").addEventListener("click", function(){ state.taskItems.splice(idx,1); refreshTaskChips(); });
     box.appendChild(chip);
   });
 }
 function addOneTask(){
   var v=($("#taskOne").value||"").trim(); if(!v) return;
-  var lower = v.toLowerCase();
-  if (state.tasks.some(t => String(t).toLowerCase()===lower)){ alert("Already added: "+v); return; }
-  state.tasks.push(v); $("#taskOne").value=""; refreshTaskChips();
+  state.taskItems.push(v); $("#taskOne").value=""; refreshTaskChips();
 }
 $("#addTaskBtn").addEventListener("click", addOneTask);
-$("#taskOne").addEventListener("keydown", function(e){
-  if (e.key==="Enter"){ e.preventDefault(); addOneTask(); }
-  else if (e.key==="Backspace" && !this.value && state.tasks.length){ state.tasks.pop(); refreshTaskChips(); }
-});
+$("#taskOne").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); addOneTask(); } });
 
 function closeOverlay(){
   overlay.style.display="none"; document.body.style.overflow="";
@@ -1009,9 +956,7 @@ $("#btnEdit").addEventListener("click", function(){
   refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value   = p.MS_Status || "Planned";
   $("#fDesc").value     = p.MS_Description || "";
-
-  /* Load tasks into chips */
-  state.tasks = String(p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
+  state.taskItems       = (p.MS_Task||"").split(",").map(s=>s.trim()).filter(Boolean);
   refreshTaskChips(); $("#taskOne").value="";
 
   overlay.style.display="flex"; document.body.style.overflow="hidden";
@@ -1060,7 +1005,7 @@ function openModalForDate(jsDate){
   $("#fTimeStart").value="09:00"; $("#fTimeEnd").value="11:00";
   state.technicians=[]; refreshTechChips(); $("#techOne").value="";
   $("#fStatus").value="Planned"; $("#fDesc").value="";
-  state.tasks=[]; refreshTaskChips(); $("#taskOne").value="";
+  state.taskItems=[]; refreshTaskChips(); $("#taskOne").value="";
   overlay.style.display="flex"; document.body.style.overflow="hidden";
 }
 function collectPayload(){
@@ -1078,7 +1023,7 @@ function collectPayload(){
     MS_Status: $("#fStatus").value || "Planned",
     MS_Description: ($("#fDesc").value||"").trim(),
     MS_Technicians: state.technicians.join(", "),
-    MS_Task: state.tasks.join(", ")
+    MS_Task: state.taskItems.join(", ")
   };
 }
 function validatePayload(p){
@@ -1091,6 +1036,35 @@ function validatePayload(p){
   if (p.MS_End <= p.MS_Start) return "End time must be after Start time.";
   return "";
 }
+
+/* Draw immediately on calendar after successful save */
+function optimisticAdd(payload){
+  try{
+    if (!state.calendar) return;
+    const ev = {
+      title: payload.MS_Title || "Maintenance",
+      start: new Date(payload.MS_Start),
+      end:   new Date(payload.MS_End),
+      classNames: ["event", colorByStatus(payload.MS_Status)],
+      extendedProps: {
+        MS_Title: payload.MS_Title || "",
+        MS_Machine: payload.MS_Machine || "",
+        MS_Type: payload.MS_Type || "Preventive",
+        MS_Priority: payload.MS_Priority != null ? payload.MS_Priority : 3,
+        MS_Date: payload.MS_Date || null,
+        MS_Start: payload.MS_Start,
+        MS_End: payload.MS_End,
+        MS_Status: payload.MS_Status || "Planned",
+        MS_Description: payload.MS_Description || "",
+        MS_Technicians: payload.MS_Technicians || "",
+        MS_Task: payload.MS_Task || "",
+        __ts: "optimistic"
+      }
+    };
+    state.calendar.addEvent(ev);
+  }catch(e){ console.warn("optimistic add failed", e); }
+}
+
 function onCreate(){
   var payload = collectPayload();
   var err = validatePayload(payload); if (err){ alert(err); return; }
@@ -1098,8 +1072,9 @@ function onCreate(){
   writeAttributes(payload, { mode:"create" })
     .then(function(){
       closeOverlay();
-      // Pass expected details so poller can detect create precisely
-      startAutoRefresh({ start: payload.MS_Start, title: payload.MS_Title, machine: payload.MS_Machine }, null);
+      optimisticAdd(payload);                 // show immediately
+      loading("Saved ✓ Syncing…");
+      startAutoRefresh(null, null, {stopOnce:true});   // one fetch then stop
     })
     .catch(function(e){ console.error(e); alert(e.message||"Failed to save"); })
     .finally(function(){ busy(false); });
@@ -1240,12 +1215,8 @@ function generatePdf(ev){
     <div class="r-section">
       <div class="r-sec-h">Approvals</div>
       <div class="r-foot">
-        <div class="sign">
-          <strong>Technician Sign & Date</strong>
-        </div>
-        <div class="sign">
-          <strong>Supervisor Sign & Date</strong>
-        </div>
+        <div class="sign"><strong>Technician Sign & Date</strong></div>
+        <div class="sign"><strong>Supervisor Sign & Date</strong></div>
       </div>
     </div>
 
@@ -1271,7 +1242,6 @@ function generatePdf(ev){
 }
 
 /************ RUNTIME HELPERS (MC_01 only for now) ************/
-/* Fast daily fetch: last sample of the day using limit=1&orderBy=DESC, with wide fallback */
 function fetchDailyRuntimeMinutesForKey(dayDate, key){
   const s = startOfDay(dayDate).getTime();
   const e = endOfDay(dayDate).getTime();
@@ -1282,11 +1252,10 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
     "&startTs=" + s +
     "&endTs=" + e;
 
-  const fast = base + "&limit=1&orderBy=DESC"; // latest point in the day
+  const fast = base + "&limit=1&orderBy=DESC";
 
   return fetch(fast, { headers:{ "X-Authorization":"Bearer "+JWT }})
-    .then(res => res.ok ? res.json()
-                        : Promise.reject(new Error("fast runtime read failed")))
+    .then(res => res.ok ? res.json() : Promise.reject(new Error("fast runtime read failed")))
     .then(obj => {
       const arr = (obj && obj[key]) || [];
       if (arr.length) return Number(arr[0].value) || 0; // minutes
@@ -1305,10 +1274,8 @@ function fetchDailyRuntimeMinutesForKey(dayDate, key){
         });
     });
 }
-
-/* Sum runtime minutes between [startDay..endDay] inclusive */
 async function fetchRuntimeMinutesForMachine(mNorm, fromTs, endTs){
-  if (mNorm!=="MC_01") return 0; // only MC_01 wired
+  if (mNorm!=="MC_01") return 0;
   const key = "Currentday_Runtime";
 
   const start = new Date(fromTs || Date.now()); start.setHours(0,0,0,0);
@@ -1318,11 +1285,10 @@ async function fetchRuntimeMinutesForMachine(mNorm, fromTs, endTs){
   for (let d = new Date(start); d <= endDay; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+1)){
     try{ total += await fetchDailyRuntimeMinutesForKey(d, key); }catch(e){ console.warn("Runtime fetch failed", e); }
   }
-  return total; // minutes
+  return total;
 }
 
 /************ TIPS ENGINE ************/
-/* Latest completed maintenance timestamp for a machine (any type) */
 function latestCompletedTsForMachine(events, mNorm){
   let latest = null;
   for (const ev of events){
@@ -1334,8 +1300,6 @@ function latestCompletedTsForMachine(events, mNorm){
   }
   return latest;
 }
-
-/* Coverage suggestions (ANY type counts as a window) */
 async function tipsPreventiveCoverage(monthStartDate){
   const s = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth(), 1);
   const e = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth()+1, 0, 23,59,59,999);
@@ -1374,8 +1338,6 @@ async function tipsPreventiveCoverage(monthStartDate){
   }
   return cards;
 }
-
-/* Runtime info card (shown in Info panel) */
 async function tipsPreventiveRuntime(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-120);
   const events = await readRange(lookBackStart, new Date());
@@ -1400,96 +1362,58 @@ async function tipsPreventiveRuntime(){
 
   return [card];
 }
-
-/* Corrective tips using runtime-based MTBF and seconds-based Downtime_Duration */
 async function tipsCorrectiveTelemetry(){
   try{
     const { start, end, events } = await readDowntimeLast30Days();
     if (!events.length){
-      return [{
-        severity: "Info",
-        title: "No downtime recorded — MC_01",
-        subtitle: `Window: ${start.toLocaleDateString()} → ${end.toLocaleDateString()}`,
-        body: "We couldn't find downtime events for MC_01 in the past 30 days.",
-      }];
+      return [{ severity:"Info", title:"No downtime recorded — MC_01",
+        subtitle:`Window: ${start.toLocaleDateString()} → ${end.toLocaleDateString()}`,
+        body:"We couldn't find downtime events for MC_01 in the past 30 days." }];
     }
 
     const runtimeMinutes = await fetchRuntimeMinutesForMachine("MC_01", start.getTime(), end.getTime());
     const runtimeHours = runtimeMinutes / 60;
 
     const stats = analyzeDowntimeByCode(events);
-    const enriched = stats.map(s => ({
-      ...s,
-      mtbfHours: (s.count > 0 && runtimeHours > 0) ? (runtimeHours / s.count) : NaN
-    }));
+    const enriched = stats.map(s => ({ ...s, mtbfHours:(s.count>0 && runtimeHours>0) ? (runtimeHours/s.count) : NaN }));
 
-    const frequent = enriched
-      .filter(s => isFinite(s.mtbfHours))
-      .sort((a,b)=>a.mtbfHours - b.mtbfHours)
-      .slice(0,3);
-
+    const frequent = enriched.filter(s => isFinite(s.mtbfHours)).sort((a,b)=>a.mtbfHours-b.mtbfHours).slice(0,3);
     const worstByDuration = enriched.slice().sort((a,b)=>b.totalMin - a.totalMin)[0];
 
     const cards = [];
     const windowLabel = `${start.toLocaleDateString()} → ${end.toLocaleDateString()}`;
 
     if (frequent.length){
-      const lines = frequent.map(s =>
-        `• Code ${s.code}: MTBF ${humanHours(s.mtbfHours)} (occ ${s.count}, downtime ${minutesToHM(s.totalMin)})`
-      ).join("\n");
-
-      cards.push({
-        severity: "Medium",
-        title: `Frequent failures by runtime — MC_01`,
-        subtitle: `MTBF = Σ Currentday_Runtime (last 30 full days) ÷ occurrences`,
-        body: `${lines}\n\nTip: Plan corrective maintenance targeting these high-recurrence causes.`,
-        cta: { label: "Plan corrective", action: () => openModalForDate(new Date()) }
-      });
+      const lines = frequent.map(s => `• Code ${s.code}: MTBF ${humanHours(s.mtbfHours)} (occ ${s.count}, downtime ${minutesToHM(s.totalMin)})`).join("\n");
+      cards.push({ severity:"Medium", title:`Frequent failures by runtime — MC_01`,
+        subtitle:`MTBF = Σ Currentday_Runtime (last 30 full days) ÷ occurrences`,
+        body:`${lines}\n\nTip: Plan corrective maintenance targeting these high-recurrence causes.`,
+        cta:{label:"Plan corrective", action:() => openModalForDate(new Date()) }});
     }
-
     if (worstByDuration && worstByDuration.totalMin>0){
-      cards.push({
-        severity: "High",
-        title: `Biggest downtime impact — MC_01`,
-        subtitle: `Window: ${windowLabel} • Reason Code ${worstByDuration.code}`,
-        body: `Total downtime in last 30 full days: ${minutesToHM(worstByDuration.totalMin)} across ${worstByDuration.count} event(s).\nFocus a corrective action to reduce time-to-recover and recurrence.`,
-        cta: { label: "Add action", action: () => openModalForDate(new Date()) }
-      });
+      cards.push({ severity:"High", title:`Biggest downtime impact — MC_01`,
+        subtitle:`Window: ${windowLabel} • Reason Code ${worstByDuration.code}`,
+        body:`Total downtime in last 30 full days: ${minutesToHM(worstByDuration.totalMin)} across ${worstByDuration.count} event(s).\nFocus a corrective action to reduce time-to-recover and recurrence.`,
+        cta:{label:"Add action", action:() => openModalForDate(new Date()) }});
     }
-
     if (!cards.length){
       const top = enriched.slice().sort((a,b)=>b.count-a.count)[0];
       if (top){
-        cards.push({
-          severity: "Info",
-          title: `Downtime summary — MC_01`,
-          subtitle: `Window: ${windowLabel}`,
-          body: `Top code: ${top.code}, Events: ${top.count}, Total downtime: ${minutesToHM(top.totalMin)}.` +
-                (isFinite(top.mtbfHours) ? ` MTBF: ${humanHours(top.mtbfHours)}.` : "")
-        });
+        cards.push({ severity:"Info", title:`Downtime summary — MC_01`,
+          subtitle:`Window: ${windowLabel}`,
+          body:`Top code: ${top.code}, Events: ${top.count}, Total downtime: ${minutesToHM(top.totalMin)}.` + (isFinite(top.mtbfHours)?` MTBF: ${humanHours(top.mtbfHours)}.`:"")});
       }
     }
-
     if (!(runtimeMinutes > 0)){
-      cards.unshift({
-        severity: "Info",
-        title: "Runtime data unavailable",
-        body: "Σ Currentday_Runtime returned 0 in the window, so MTBF by runtime couldn’t be computed accurately."
-      });
+      cards.unshift({ severity:"Info", title:"Runtime data unavailable", body:"Σ Currentday_Runtime returned 0 in the window, so MTBF by runtime couldn’t be computed accurately." });
     }
 
     return cards;
   }catch(err){
     console.error("Corrective telemetry error", err);
-    return [{
-      severity: "Info",
-      title: "Corrective tips unavailable",
-      body: "We couldn't analyse downtime telemetry. Check token / device data and try again."
-    }];
+    return [{ severity:"Info", title:"Corrective tips unavailable", body:"We couldn't analyse downtime telemetry. Check token / device data and try again." }];
   }
 }
-
-/* Missed tips: overdue planned/in-progress tasks */
 async function tipsMissed(){
   const lookBackStart = new Date(); lookBackStart.setDate(lookBackStart.getDate()-60);
   const now = new Date();
@@ -1514,9 +1438,6 @@ async function tipsMissed(){
   return missed;
 }
 
-/* Tips loading helper */
-function tipsLoadingHTML(){ return '<div class="loading-block"><span class="spinner"></span><span>Analysing the data…</span></div>'; }
-
 /* Render helpers */
 function tipCardHTML(t){
   const sevChip = t.severity ? `<span class="chip-note">${escapeHtml(t.severity)}</span>` : "";
@@ -1540,17 +1461,6 @@ function tipCardHTML(t){
 /* Main tips renderer */
 async function renderTips(){
   loading("Analysing tips…");
-
-  // show loading spinners inside each pane
-  $("#tipsPrevBody").innerHTML = tipsLoadingHTML();
-  $("#tipsCorrBody").innerHTML = tipsLoadingHTML();
-  $("#tipsMissBody").innerHTML = tipsLoadingHTML();
-  $("#tipsInfoBody").innerHTML = tipsLoadingHTML();
-  $("#tipsPrevCount").textContent = "";
-  $("#tipsCorrCount").textContent = "";
-  $("#tipsMissCount").textContent = "";
-  $("#tipsInfoCount").textContent = "";
-
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -1562,7 +1472,6 @@ async function renderTips(){
       tipsPreventiveRuntime()
     ]);
 
-    // COVERAGE
     const prevBody = $("#tipsPrevBody");
     const prevCards = coverageCards || [];
     prevBody.innerHTML = prevCards.length
@@ -1571,31 +1480,28 @@ async function renderTips(){
     prevBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date())));
     $("#tipsPrevCount").textContent = prevCards.length ? `(${prevCards.length})` : "";
 
-    // CORRECTIVE
     const corrBody = $("#tipsCorrBody");
     const corrCards = correctiveCards || [];
     corrBody.innerHTML = corrCards.length
       ? corrCards.map(t=>tipCardHTML(t)).join("")
       : `<div class="tip-empty">No corrective suggestions.</div>`;
-    corrBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date()))));
+    corrBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date())));
     $("#tipsCorrCount").textContent = corrCards.length ? `(${corrCards.length})` : "";
 
-    // MISSED
     const missBody = $("#tipsMissBody");
     const miss = missedCards || [];
     missBody.innerHTML = miss.length
       ? miss.map(t=>tipCardHTML(t)).join("")
       : `<div class="tip-empty">No missed items detected.</div>`;
-    missBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date()))));
+    missBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date())));
     $("#tipsMissCount").textContent = miss.length ? `(${miss.length})` : "";
 
-    // INFO
     const infoBody = $("#tipsInfoBody");
     const infoCards = runtimeCards || [];
     infoBody.innerHTML = infoCards.length
       ? infoCards.map(t=>tipCardHTML(t)).join("")
       : `<div class="tip-empty">No additional info.</div>`;
-    infoBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date()))));
+    infoBody.querySelectorAll(".tip-card .btn").forEach(btn=>btn.addEventListener("click", ()=>openModalForDate(new Date())));
     $("#tipsInfoCount").textContent = infoCards.length ? `(${infoCards.length})` : "";
 
     loading("Tips ready");
@@ -1611,15 +1517,14 @@ async function renderTips(){
 
 /************ BOOT ************/
 function startCalendar(){
+  const calEl = $("#calendar");
   if (!window.FullCalendar){
-    document.getElementById('calendar').innerHTML =
-      '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
+    calEl.innerHTML = '<div class="empty"><span class="err">FullCalendar failed to load.</span></div>'; return;
   }
   if (!JWT){
-    document.getElementById('calendar').innerHTML =
-      '<div class="empty"><span class="err">Missing JWT (?token=…)</span></div>'; return;
+    calEl.innerHTML = '<div class="empty"><span class="err">Missing JWT (?token=…)</span></div>'; return;
   }
-  var calEl = $("#calendar");
+
   state.calendar = new FullCalendar.Calendar(calEl, {
     initialView: "dayGridMonth",
     headerToolbar: { left: "prev,next today", center: "title", right: "" },
